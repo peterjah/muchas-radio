@@ -2,8 +2,9 @@ use actix_web::{get, web, HttpRequest, HttpResponse, Result};
 use actix_ws::Message;
 use futures::StreamExt;
 use log::{error, info};
+use uuid::Uuid;
 
-use crate::state::AppState;
+use crate::state::{AppState, SessionWrapper};
 
 #[get("/api/ws")]
 pub async fn websocket(
@@ -13,12 +14,16 @@ pub async fn websocket(
 ) -> Result<HttpResponse> {
     let (response, mut session, mut msg_stream) = actix_ws::handle(&req, body)?;
     
-    info!("WebSocket connection established");
+    let session_id = Uuid::new_v4();
+    info!("WebSocket connection established: {}", session_id);
     
-    // Add session to state
+    // Add session to state with unique ID
     {
         let mut sessions = state.ws_sessions.lock().await;
-        sessions.push(session.clone());
+        sessions.push(SessionWrapper {
+            id: session_id,
+            session: session.clone(),
+        });
     }
     
     // Spawn task to handle incoming messages
@@ -35,7 +40,7 @@ pub async fn websocket(
                     // Can handle client messages here if needed
                 }
                 Message::Close(_) => {
-                    info!("WebSocket connection closed");
+                    info!("WebSocket connection closed: {}", session_id);
                     break;
                 }
                 _ => {}
@@ -43,22 +48,25 @@ pub async fn websocket(
         }
         
         // Remove session from state when connection closes
-        let mut sessions = state_clone.ws_sessions.lock().await;
-        sessions.retain(|s| !std::ptr::eq(s, &session));
+        state_clone.remove_session(session_id).await;
+        info!("WebSocket session removed: {}", session_id);
     });
     
     Ok(response)
 }
 
 #[get("/api/stream")]
-pub async fn stream_proxy() -> Result<HttpResponse> {
+pub async fn stream_proxy(state: web::Data<AppState>) -> Result<HttpResponse> {
     use actix_web::body::BodyStream;
     use futures::stream::StreamExt;
     
-    // Create streaming proxy to MPD HTTP stream
-    let client = reqwest::Client::new();
+    // Get MPD stream URL from environment or use default
+    let mpd_host = std::env::var("MPD_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+    let stream_port = std::env::var("MPD_STREAM_PORT").unwrap_or_else(|_| "8001".to_string());
+    let stream_url = format!("http://{}:{}", mpd_host, stream_port);
     
-    match client.get("http://localhost:8001").send().await {
+    // Use shared HTTP client instead of creating a new one each time
+    match state.http_client.get(&stream_url).send().await {
         Ok(response) => {
             let mut builder = HttpResponse::Ok();
             

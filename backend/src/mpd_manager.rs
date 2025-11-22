@@ -92,10 +92,16 @@ pub async fn get_queue(state: &AppState) -> Result<Vec<QueueItem>, String> {
 
 async fn song_in_queue_to_track(song: &SongInQueue, state: &AppState) -> Track {
     let filename = song.song.url.to_string();
-    let track_id = Path::new(&filename)
+    let file_stem = Path::new(&filename)
         .file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or(&filename)
+        .unwrap_or(&filename);
+    
+    // Extract the UUID part from the filename (format: {uuid}_{original_filename})
+    let track_id = file_stem
+        .split('_')
+        .next()
+        .unwrap_or(file_stem)
         .to_string();
     
     // Try to get metadata from our stored data

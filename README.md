@@ -34,7 +34,12 @@
 
 Before you begin, ensure you have the following installed:
 
-- **Rust** (latest stable) - https://rustup.rs/
+- **Rust** (1.83.0 or newer) - https://rustup.rs/
+  ```bash
+  # Install or update Rust
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  rustup update stable
+  ```
 - **Node.js** (v18+) - https://nodejs.org/
 - **Music Player Daemon (MPD)**:
   - macOS: `brew install mpd`
@@ -173,39 +178,75 @@ cargo run --release
 
 ## 🚢 Deployment
 
-### Automated Deployment Script
+### Docker Deployment (Recommended) 🐳
 
-An automated deployment script is included that handles everything for you:
+The easiest and most reliable way to deploy Muchas Radio is using Docker:
+
+#### Quick Deploy
 
 ```bash
-# On your VPS (Ubuntu)
+# On your server
 git clone https://github.com/yourusername/muchas-radio.git
 cd muchas-radio
-chmod +x deploy.sh
-./deploy.sh
+
+# Run the deployment script
+./docker-deploy.sh yourdomain.com
+# or with an IP address
+./docker-deploy.sh 192.168.1.100
 ```
 
-The script will:
-- Install all dependencies (nginx, mpd, rust, node.js)
-- Build backend and frontend
-- Configure nginx with SSL (if using a domain)
-- Setup systemd services for auto-start
-- Configure firewall
+The deployment script will:
+- Configure environment variables for your domain/IP
+- Build all Docker images
+- Start all services (MPD, Backend, Frontend, Nginx)
+- Display service status and useful commands
 
-**Usage:**
-```bash
-./deploy.sh                              # Interactive mode (recommended)
-./deploy.sh yourdomain.com               # Specify domain
-./deploy.sh yourdomain.com /opt/muchas   # Specify domain and install path
-```
-
-### Updating
-
-Use the included update script:
+#### Manual Docker Deployment
 
 ```bash
-./update.sh
+# Set your domain or IP
+export VITE_API_URL=http://your-domain.com
+export VITE_WS_URL=ws://your-domain.com
+
+# Build and start
+docker compose up -d
+
+# Check status
+docker compose ps
+
+# View logs
+docker compose logs -f
 ```
+
+#### Services
+
+Once deployed, you'll have:
+- **Frontend**: Port 3000 (nginx serving React app)
+- **Backend API**: Port 8080
+- **MPD Server**: Port 6600 (internal)
+- **Audio Stream**: Port 8001 (internal)
+
+#### Update Deployment
+
+```bash
+# Pull latest changes
+git pull
+
+# Rebuild and restart
+docker compose up -d --build
+
+# Or use the shortcut
+docker compose build && docker compose up -d
+```
+
+#### SSL/HTTPS Setup
+
+For production with HTTPS, you'll need to configure SSL certificates separately. Consider using:
+- **Traefik** - Automatic Let's Encrypt certificates
+- **Caddy** - Automatic HTTPS
+- **Nginx Proxy Manager** - Web UI for reverse proxy + SSL
+
+See `DOCKER_DEPLOYMENT.md` for advanced configuration options.
 
 ## 🛠️ Development
 
@@ -255,12 +296,35 @@ npm run lint     # Run linter
 
 ## 📊 Monitoring
 
-```bash
-# View logs
-sudo journalctl -u muchas-radio-backend -f
+### Docker Deployment
 
-# Check status
-sudo systemctl status muchas-radio-backend
+```bash
+# View all logs
+docker compose logs -f
+
+# View specific service logs
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose logs -f mpd
+
+# Check service status
+docker compose ps
+
+# Check resource usage
+docker stats
+```
+
+### Development (Non-Docker)
+
+```bash
+# Backend logs (if using cargo run)
+# Logs will appear in the terminal
+
+# MPD logs
+tail -f backend/mpd.log
+
+# Check MPD status
+mpc status
 ```
 
 ## 🤝 Contributing

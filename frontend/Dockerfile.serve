@@ -1,0 +1,26 @@
+# Frontend Dockerfile using Node.js serve instead of nginx
+FROM node:20-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies and serve
+RUN npm ci && npm install -g serve
+
+# Copy source code
+COPY . .
+
+# Build arguments for API URLs
+ARG VITE_API_URL
+ARG VITE_WS_URL
+
+# Build the app
+RUN npm run build
+
+EXPOSE 80
+
+# Serve the built files with Node.js
+CMD ["serve", "-s", "dist", "-l", "80"]
+

@@ -143,6 +143,9 @@ async fn main() -> std::io::Result<()> {
             .service(api::stream::websocket)
             .service(api::stream::stream_proxy)
     })
+    .workers(2)  // Limit worker threads to reduce resource usage
+    .max_connections(1000)  // Limit maximum connections
+    .max_connection_rate(256)  // Limit connection rate
     .bind(&bind_addr)?
     .run()
     .await

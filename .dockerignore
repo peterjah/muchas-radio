@@ -1,0 +1,39 @@
+# Backend
+backend/target/
+backend/uploads/
+backend/playlists/
+backend/mpd.conf
+backend/mpd.db
+backend/mpd.log
+backend/mpd.pid
+backend/state
+backend/sticker.sql
+backend/.cargo/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/.env.production
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docs
+*.md
+LICENSE
+
+# Docker
+docker-compose.override.yml
+

@@ -1,6 +1,5 @@
 # Rust backend
 /backend/target/
-/backend/Cargo.lock
 /backend/uploads/*
 !/backend/uploads/.gitkeep
 /backend/mpd.conf
