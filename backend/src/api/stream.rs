@@ -3,6 +3,8 @@ use actix_ws::Message;
 use futures::StreamExt;
 use log::{error, info};
 use uuid::Uuid;
+use tokio::time::{interval, Duration};
+use tokio_stream::wrappers::IntervalStream;
 
 use crate::state::{AppState, SessionWrapper};
 
@@ -12,7 +14,7 @@ pub async fn websocket(
     body: web::Payload,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse> {
-    let (response, mut session, mut msg_stream) = actix_ws::handle(&req, body)?;
+    let (response, mut session, msg_stream) = actix_ws::handle(&req, body)?;
     
     let session_id = Uuid::new_v4();
     info!("WebSocket connection established: {}", session_id);
@@ -26,24 +28,45 @@ pub async fn websocket(
         });
     }
     
-    // Spawn task to handle incoming messages
+    // Spawn single task to handle both incoming messages and periodic pings
     let state_clone = state.get_ref().clone();
     actix_web::rt::spawn(async move {
-        while let Some(Ok(msg)) = msg_stream.next().await {
-            match msg {
-                Message::Ping(bytes) => {
-                    if session.pong(&bytes).await.is_err() {
+        let mut msg_stream = msg_stream.fuse();
+        let ping_interval = interval(Duration::from_secs(30));
+        let mut ping_stream = IntervalStream::new(ping_interval).fuse();
+        
+        loop {
+            tokio::select! {
+                // Handle incoming messages
+                Some(msg) = msg_stream.next() => {
+                    match msg {
+                        Ok(Message::Ping(bytes)) => {
+                            if session.pong(&bytes).await.is_err() {
+                                break;
+                            }
+                        }
+                        Ok(Message::Text(_)) => {
+                            // Can handle client messages here if needed
+                        }
+                        Ok(Message::Close(_)) => {
+                            info!("WebSocket connection closed by client: {}", session_id);
+                            break;
+                        }
+                        Err(e) => {
+                            info!("WebSocket error: {:?}, closing session {}", e, session_id);
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+                // Send periodic pings
+                Some(_) = ping_stream.next() => {
+                    if session.ping(b"").await.is_err() {
+                        info!("Failed to send ping to session {}, closing", session_id);
                         break;
                     }
                 }
-                Message::Text(_) => {
-                    // Can handle client messages here if needed
-                }
-                Message::Close(_) => {
-                    info!("WebSocket connection closed: {}", session_id);
-                    break;
-                }
-                _ => {}
+                else => break,
             }
         }
         

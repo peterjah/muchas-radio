@@ -140,6 +140,7 @@ async fn main() -> std::io::Result<()> {
             .service(api::playlist::get_current)
             .service(api::playlist::get_queue_list)
             .service(api::playlist::add_to_queue)
+            .service(api::playlist::play)
             .service(api::stream::websocket)
             .service(api::stream::stream_proxy)
     })

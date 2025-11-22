@@ -123,6 +123,37 @@ async fn song_in_queue_to_track(song: &SongInQueue, state: &AppState) -> Track {
     }
 }
 
+pub async fn start_playback(state: &AppState) -> Result<(), String> {
+    let client = state.mpd_client.lock().await;
+    
+    let status = client
+        .command(commands::Status)
+        .await
+        .map_err(|e| format!("Failed to get status: {}", e))?;
+    
+    match status.state {
+        PlayState::Stopped => {
+            client
+                .command(commands::Play::current())
+                .await
+                .map_err(|e| format!("Failed to start playback: {}", e))?;
+            info!("Started playback");
+        }
+        PlayState::Paused => {
+            client
+                .command(commands::Play::current())
+                .await
+                .map_err(|e| format!("Failed to resume playback: {}", e))?;
+            info!("Resumed playback");
+        }
+        PlayState::Playing => {
+            // Already playing
+        }
+    }
+    
+    Ok(())
+}
+
 pub async fn start_mpd_monitor(state: AppState) {
     tokio::spawn(async move {
         loop {

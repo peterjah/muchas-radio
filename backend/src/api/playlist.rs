@@ -2,7 +2,7 @@ use actix_web::{get, post, web, HttpResponse, Result};
 use log::error;
 
 use crate::models::AddToQueueRequest;
-use crate::mpd_manager::{add_file_to_mpd, get_current_track, get_queue};
+use crate::mpd_manager::{add_file_to_mpd, get_current_track, get_queue, start_playback};
 use crate::state::AppState;
 
 #[get("/api/current")]
@@ -62,6 +62,30 @@ pub async fn add_to_queue(
         }
         Err(e) => {
             error!("Failed to add to queue: {}", e);
+            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": e
+            })))
+        }
+    }
+}
+
+#[post("/api/play")]
+pub async fn play(state: web::Data<AppState>) -> Result<HttpResponse> {
+    match start_playback(&state).await {
+        Ok(_) => {
+            // Notify via WebSocket
+            let track_update = serde_json::json!({
+                "type": "current_track",
+                "data": {}
+            });
+            state.broadcast_message(&track_update.to_string()).await;
+            
+            Ok(HttpResponse::Ok().json(serde_json::json!({
+                "success": true
+            })))
+        }
+        Err(e) => {
+            error!("Failed to start playback: {}", e);
             Ok(HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": e
             })))
