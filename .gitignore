@@ -1,0 +1,31 @@
+# Rust backend
+/backend/target/
+/backend/Cargo.lock
+/backend/uploads/*
+!/backend/uploads/.gitkeep
+/backend/mpd.conf
+/backend/mpd.db
+/backend/mpd.log
+/backend/mpd.pid
+/backend/state
+/backend/sticker.sql
+/backend/playlists/*
+!/backend/playlists/.gitkeep
+
+# Frontend
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.env
+/frontend/.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+

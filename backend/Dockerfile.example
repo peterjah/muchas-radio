@@ -1,0 +1,52 @@
+# Example Dockerfile for Muchas Radio Backend
+# This demonstrates how the dynamic MPD configuration works in production
+
+FROM rust:1.75 as builder
+
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+
+# Install MPD and dependencies
+RUN apt-get update && apt-get install -y \
+    mpd \
+    libmpd-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the built binary
+COPY --from=builder /app/target/release/muchas-radio-backend .
+COPY mpd.conf.template .
+
+# Create directories for MPD data
+RUN mkdir -p /app/data/uploads /app/data/playlists
+
+# Set environment variables for production
+ENV MPD_BASE_DIR=/app/data
+ENV MPD_MUSIC_DIR=/app/data/uploads
+ENV MPD_PLAYLIST_DIR=/app/data/playlists
+ENV MPD_DATA_DIR=/app/data
+ENV MPD_BIND_ADDRESS=0.0.0.0
+ENV MPD_PORT=6600
+ENV MPD_STREAM_PORT=8001
+ENV BIND_ADDR=0.0.0.0:8080
+ENV RUST_LOG=info
+
+# Volume for persistent data
+VOLUME ["/app/data"]
+
+# Expose ports
+EXPOSE 8080 6600 8001
+
+# Start script that runs both backend and MPD
+COPY docker-entrypoint.sh /
+RUN chmod +x /docker-entrypoint.sh
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+

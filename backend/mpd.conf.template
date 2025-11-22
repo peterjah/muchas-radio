@@ -1,0 +1,36 @@
+# Music Player Daemon Configuration for Muchas Radio
+
+# Paths
+music_directory    "{{MUSIC_DIR}}"
+playlist_directory "{{PLAYLIST_DIR}}"
+db_file            "{{DATA_DIR}}/mpd.db"
+log_file           "{{DATA_DIR}}/mpd.log"
+pid_file           "{{DATA_DIR}}/mpd.pid"
+state_file         "{{DATA_DIR}}/state"
+sticker_file       "{{DATA_DIR}}/sticker.sql"
+
+# Network
+bind_to_address    "{{BIND_ADDRESS}}"
+port               "{{MPD_PORT}}"
+
+# Audio output - HTTP streaming
+audio_output {
+    type            "httpd"
+    name            "HTTP Stream"
+    encoder         "lame"
+    port            "{{STREAM_PORT}}"
+    bind_to_address "{{BIND_ADDRESS}}"
+    bitrate         "192"
+    format          "44100:16:2"
+    always_on       "yes"
+    tags            "yes"
+}
+
+# Settings
+auto_update         "yes"
+auto_update_depth   "3"
+follow_outside_symlinks "yes"
+follow_inside_symlinks  "yes"
+
+# Performance
+max_output_buffer_size  "16384"

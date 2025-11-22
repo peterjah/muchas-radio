@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@theme {
+  /* Custom color palette - Tropical Muchas Radio */
+  --color-tropical-sand: #f5ebd9;
+  --color-tropical-beige: #e8d0a8;
+  --color-tropical-gold: #e8b64e;
+  --color-tropical-orange: #d4824a;
+  --color-tropical-dark: #2c3e2f;
+  --color-tropical-green: #3a5a3d;
+  
+  /* Semantic colors */
+  --color-primary: var(--color-tropical-gold);
+  --color-primary-dark: #d4a43d;
+  --color-accent: var(--color-tropical-orange);
+  --color-accent-dark: #c27339;
+  --color-background: var(--color-tropical-sand);
+  --color-surface: #ffffff;
+  --color-text: var(--color-tropical-dark);
+  --color-text-muted: #666666;
+}
+
+/* Global styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--color-tropical-sand) 0%, var(--color-tropical-beige) 100%);
+  background-attachment: fixed;
+  color: var(--color-text);
+}
+
+/* Custom scrollbar styles */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    to bottom,
+    var(--color-tropical-gold),
+    var(--color-tropical-orange)
+  );
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    to bottom,
+    var(--color-primary-dark),
+    var(--color-accent-dark)
+  );
+}
+
+/* Sonner toast customization */
+.sonner-toast {
+  border-radius: 12px !important;
+}
+
+/* Input range styling for volume control */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(
+    to bottom right,
+    var(--color-tropical-gold),
+    var(--color-tropical-orange)
+  );
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+input[type='range']::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: linear-gradient(
+    to bottom right,
+    var(--color-tropical-gold),
+    var(--color-tropical-orange)
+  );
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+input[type='range']::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
