@@ -50,7 +50,15 @@ cat > .env << EOF
 VITE_API_URL=${PROTOCOL}://${DOMAIN_OR_IP}
 VITE_WS_URL=${WS_PROTOCOL}://${DOMAIN_OR_IP}
 DOMAIN=${DOMAIN_OR_IP}
+# Music storage path (default: ./data/music)
+# Uncomment and modify if you want a custom path:
+# MUSIC_STORAGE_PATH=/var/muchas-radio/music
 EOF
+
+# Add MUSIC_STORAGE_PATH to .env if it's set
+if [ -n "$MUSIC_STORAGE_PATH" ] && [ "$MUSIC_STORAGE_PATH" != "./data/music" ]; then
+    echo "MUSIC_STORAGE_PATH=$MUSIC_STORAGE_PATH" >> .env
+fi
 
 echo "✅ Environment configuration created"
 echo ""
@@ -72,6 +80,26 @@ fi
 echo "🐳 Docker version:"
 docker --version
 docker compose version
+echo ""
+
+# Setup music storage directory
+echo "📁 Setting up music storage..."
+MUSIC_STORAGE_PATH=${MUSIC_STORAGE_PATH:-./data/music}
+MUSIC_DIR=$(realpath "$MUSIC_STORAGE_PATH" 2>/dev/null || echo "$MUSIC_STORAGE_PATH")
+
+# Create directory if it doesn't exist
+if [ ! -d "$MUSIC_DIR" ]; then
+    echo "   Creating directory: $MUSIC_DIR"
+    mkdir -p "$MUSIC_DIR"
+    chmod 755 "$MUSIC_DIR"
+    echo "   ✅ Directory created"
+else
+    echo "   ✅ Directory exists: $MUSIC_DIR"
+fi
+
+# Export for docker-compose
+export MUSIC_STORAGE_PATH="$MUSIC_STORAGE_PATH"
+echo "   📂 Music storage: $MUSIC_DIR"
 echo ""
 
 # Stop existing containers
@@ -113,6 +141,9 @@ echo "  • Frontend: http://localhost:3000 (nginx)"
 echo "  • Backend API: http://localhost:8080"
 echo "  • MPD: localhost:6600"
 echo "  • Stream: http://localhost:8001"
+echo ""
+echo "Storage:"
+echo "  • Music files: $MUSIC_DIR"
 echo ""
 echo "Useful commands:"
 echo "  View logs:        docker compose logs -f"

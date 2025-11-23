@@ -6,12 +6,15 @@ RUN apk add --no-cache \
     mpc \
     lame
 
-# Create directories
-RUN mkdir -p /music /var/lib/mpd/playlists /var/log/mpd && \
-    touch /var/lib/mpd/database /var/lib/mpd/state /var/lib/mpd/sticker.sql
+# Create directories (don't create database file - MPD will create it)
+RUN mkdir -p /music /var/lib/mpd/playlists /var/log/mpd
 
 # Default MPD configuration
 COPY mpd.conf /etc/mpd.conf
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Fix permissions
 RUN chown -R mpd:audio /music /var/lib/mpd /var/log/mpd
@@ -20,5 +23,5 @@ USER mpd
 
 EXPOSE 6600 8001
 
-CMD ["mpd", "--no-daemon", "/etc/mpd.conf"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
 
