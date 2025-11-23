@@ -1,16 +1,17 @@
-# Music Player Daemon Configuration
+# MPD Configuration for Local Development
+# Copy this file to mpd.conf and adjust paths as needed
 
-music_directory    "/music"
+music_directory    "./uploads"
 # Note: playlist_directory is required by MPD but not used by this application
 # (we use MPD's in-memory queue instead of saved playlist files)
-playlist_directory "/var/lib/mpd/playlists"
-db_file            "/var/lib/mpd/database"
-log_file           "/var/log/mpd/mpd.log"
-pid_file           "/var/lib/mpd/pid"
-state_file         "/var/lib/mpd/state"
-sticker_file       "/var/lib/mpd/sticker.sql"
+playlist_directory "./playlists"
+db_file            "./mpd.db"
+log_file           "./mpd.log"
+pid_file           "./mpd.pid"
+state_file         "./state"
+sticker_file       "./sticker.sql"
 
-bind_to_address    "0.0.0.0"
+bind_to_address    "127.0.0.1"
 port               "6600"
 
 # HTTP Stream Output
@@ -19,7 +20,7 @@ audio_output {
     name            "HTTP Stream"
     encoder         "lame"
     port            "8001"
-    bind_to_address "0.0.0.0"
+    bind_to_address "127.0.0.1"
     bitrate         "192"
     format          "44100:16:2"
     always_on       "yes"

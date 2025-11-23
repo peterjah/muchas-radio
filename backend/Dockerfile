@@ -34,17 +34,10 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /app/target/release/muchas-radio-backend /app/backend
 
 # Create necessary directories
-RUN mkdir -p /app/uploads /app/playlists /app/data
-
-# Copy MPD config template to the data directory
-COPY mpd.conf.template /app/data/
+RUN mkdir -p /app/uploads /app/data
 
 # Set environment variables
-ENV MPD_BASE_DIR=/app/data \
-    MPD_MUSIC_DIR=/app/uploads \
-    MPD_PLAYLIST_DIR=/app/playlists \
-    MPD_BIND_ADDRESS=0.0.0.0 \
-    BIND_ADDR=0.0.0.0:8080 \
+ENV BIND_ADDR=0.0.0.0:8080 \
     RUST_LOG=info
 
 EXPOSE 8080

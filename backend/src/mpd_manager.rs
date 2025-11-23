@@ -162,7 +162,7 @@ pub async fn start_mpd_monitor(state: AppState) {
             
             match get_current_track(&state).await {
                 Ok(current) => {
-                    // Check if playlist has ended (stopped state with no current track but queue has items)
+                    // Check if queue playback has ended (stopped state with no current track but queue has items)
                     if current.state == PlaybackState::Stopped && current.track.is_none() {
                         // Check if there are tracks in the queue and restart from the beginning
                         {
@@ -176,9 +176,9 @@ pub async fn start_mpd_monitor(state: AppState) {
                                     if !queue_vec.is_empty() {
                                         // Play the first song (position 0)
                                         if let Err(e) = client.command(commands::Play::song(SongPosition(0))).await {
-                                            error!("Failed to restart playlist: {}", e);
+                                            error!("Failed to restart queue: {}", e);
                                         } else {
-                                            info!("Playlist ended, restarting from beginning");
+                                            info!("Queue playback ended, restarting from beginning");
                                         }
                                     }
                                 }

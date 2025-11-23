@@ -138,7 +138,7 @@ export const Queue: React.FC<QueueProps> = ({ queue, isLoading }) => {
                   Queue is empty
                 </p>
                 <p className="text-sm text-[var(--color-text-muted)] mt-2">
-                  Upload tracks to build the playlist! 🎶
+                  Upload tracks to build the queue! 🎶
                 </p>
               </motion.div>
             )}

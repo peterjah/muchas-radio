@@ -1,28 +1,24 @@
 # Muchas Radio Backend
 
-Rust backend server for Muchas Radio application using Actix-web and MPD (Music Player Daemon).
+Rust backend server for Muchas Radio application using Actix-web. The backend connects to MPD (Music Player Daemon) as a client - it does not run MPD itself.
+
+## Architecture
+
+- **Backend**: Connects to MPD via TCP (MPD protocol on port 6600)
+- **MPD**: Runs as a separate service (either locally or in a Docker container)
+- In Docker: MPD runs in a dedicated `mpd` container, backend connects via service name
 
 ## Configuration
 
-The backend generates MPD configuration at runtime from `mpd.conf.template`. This approach:
-- ✅ Works in any environment (dev, production, Docker)
-- ✅ No hardcoded paths in the repository
-- ✅ Easy to customize via environment variables
-- ✅ Automatically creates required directories
-
 ### Environment Variables
 
-**MPD Configuration:**
-- `MPD_BASE_DIR`: Base directory for MPD files (default: current directory)
-- `MPD_MUSIC_DIR`: Directory for music files (default: `$MPD_BASE_DIR/uploads`)
-- `MPD_PLAYLIST_DIR`: Directory for playlists (default: `$MPD_BASE_DIR/playlists`)
-- `MPD_DATA_DIR`: Directory for MPD database and state files (default: `$MPD_BASE_DIR`)
-- `MPD_BIND_ADDRESS`: IP address for MPD to bind to (default: `127.0.0.1`)
-- `MPD_PORT`: Port for MPD server (default: `6600`)
-- `MPD_STREAM_PORT`: Port for HTTP audio stream (default: `8001`)
+**MPD Connection:**
+- `MPD_HOST`: MPD server hostname/IP to connect to (default: `127.0.0.1`)
+  - In Docker: use service name `mpd`
+  - In development: use `127.0.0.1` or `localhost`
+- `MPD_PORT`: MPD server port (default: `6600`)
 
 **Backend API:**
-- `MPD_HOST`: MPD server host to connect to (default: `127.0.0.1`)
 - `BIND_ADDR`: Address for HTTP API server (default: `127.0.0.1:8080`)
 - `RUST_LOG`: Logging level (default: `info`)
 
@@ -32,9 +28,9 @@ You can create a `.env` file in the backend directory for easier configuration:
 
 ```bash
 # .env
-MPD_BASE_DIR=/var/lib/muchas-radio
-MPD_MUSIC_DIR=/mnt/music
-MPD_BIND_ADDRESS=0.0.0.0
+MPD_HOST=127.0.0.1
+MPD_PORT=6600
+BIND_ADDR=0.0.0.0:8080
 RUST_LOG=debug
 ```
 
@@ -45,29 +41,41 @@ export $(cat .env | xargs) && cargo run
 
 ### Example Usage
 
-Development (using defaults):
+**Development:**
+
+Option 1: Using Docker (Recommended)
 ```bash
+# Start MPD and backend with Docker
+docker compose up mpd backend
+
+# In another terminal, start backend for development
 cd backend
 cargo run
-# In another terminal:
-mpd backend/mpd.conf
 ```
 
-Production with custom paths:
+Option 2: Local MPD
 ```bash
-export MPD_BASE_DIR=/var/lib/muchas-radio
-export MPD_MUSIC_DIR=/mnt/music
-export MPD_BIND_ADDRESS=0.0.0.0
-cargo run --release
-# In another terminal:
-mpd /var/lib/muchas-radio/mpd.conf
+cd backend
+
+# Create MPD config from example (first time only)
+cp mpd.conf.example mpd.conf
+# Edit mpd.conf if needed (adjust paths)
+
+# Start MPD and backend
+./start-dev.sh
+
+# Or start manually:
+# Terminal 1: mpd mpd.conf
+# Terminal 2: cargo run
 ```
 
-Docker:
-```dockerfile
-ENV MPD_BASE_DIR=/app/data
-ENV MPD_MUSIC_DIR=/app/data/music
-ENV MPD_BIND_ADDRESS=0.0.0.0
+**Docker:**
+The backend connects to the MPD service automatically:
+```yaml
+environment:
+  - MPD_HOST=mpd  # Service name in docker-compose
+  - MPD_PORT=6600
+  - BIND_ADDR=0.0.0.0:8080
 ```
 
 ## Development

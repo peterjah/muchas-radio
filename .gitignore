@@ -8,8 +8,6 @@
 /backend/mpd.pid
 /backend/state
 /backend/sticker.sql
-/backend/playlists/*
-!/backend/playlists/.gitkeep
 
 # Frontend
 /frontend/node_modules/
@@ -27,4 +25,9 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# Docker data directories
+/data/
+.env
+.env.local
 

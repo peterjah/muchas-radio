@@ -7,14 +7,14 @@ RUN apk add --no-cache \
     lame
 
 # Create directories
-RUN mkdir -p /music /playlists /var/lib/mpd /var/log/mpd && \
+RUN mkdir -p /music /var/lib/mpd/playlists /var/log/mpd && \
     touch /var/lib/mpd/database /var/lib/mpd/state /var/lib/mpd/sticker.sql
 
 # Default MPD configuration
 COPY mpd.conf /etc/mpd.conf
 
 # Fix permissions
-RUN chown -R mpd:audio /music /playlists /var/lib/mpd /var/log/mpd
+RUN chown -R mpd:audio /music /var/lib/mpd /var/log/mpd
 
 USER mpd
 

@@ -14,7 +14,6 @@ services:
     volumes:
       - mpd-data:/var/lib/mpd
       - music-uploads:/music
-      - playlists:/playlists
     networks:
       - muchas-network
     healthcheck:
@@ -36,15 +35,10 @@ services:
     environment:
       - MPD_HOST=mpd
       - MPD_PORT=6600
-      - MPD_BASE_DIR=/app/data
-      - MPD_MUSIC_DIR=/app/uploads
-      - MPD_PLAYLIST_DIR=/app/playlists
-      - MPD_BIND_ADDRESS=0.0.0.0
       - BIND_ADDR=0.0.0.0:8080
       - RUST_LOG=info
     volumes:
       - music-uploads:/app/uploads
-      - playlists:/app/playlists
       - backend-data:/app/data
     depends_on:
       - mpd
@@ -102,10 +96,15 @@ services:
 volumes:
   mpd-data:
     driver: local
+  # Music storage: uses bind mount to host directory for easy access
+  # Default: ./data/music (relative to docker-compose.yml)
+  # Override with MUSIC_STORAGE_PATH environment variable
   music-uploads:
     driver: local
-  playlists:
-    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${MUSIC_STORAGE_PATH:-./data/music}
   backend-data:
     driver: local
 

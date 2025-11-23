@@ -8,21 +8,18 @@ cd "$(dirname "$0")"
 echo "🎵 Starting Muchas Radio Backend (Development Mode)"
 echo "=================================================="
 
-# Step 1: Generate MPD config by building the binary
-echo "Generating MPD configuration..."
-cargo build
-
-# Step 2: Run just to generate config (will fail to connect, that's ok)
-echo "Running config generation..."
-timeout 3 ./target/debug/muchas-radio-backend 2>/dev/null || true
-
-# Check if mpd.conf was generated
+# Step 1: Check if MPD config exists, create from example if not
 if [ ! -f "mpd.conf" ]; then
-    echo "❌ Error: mpd.conf not generated"
-    exit 1
+    if [ -f "mpd.conf.example" ]; then
+        echo "Creating mpd.conf from example..."
+        cp mpd.conf.example mpd.conf
+        echo "✅ Created mpd.conf (edit if needed)"
+    else
+        echo "❌ Error: mpd.conf not found and mpd.conf.example doesn't exist"
+        echo "Please create mpd.conf manually or use Docker: docker compose up"
+        exit 1
+    fi
 fi
-
-echo "✅ Configuration generated"
 
 # Step 3: Start MPD first
 echo "Starting MPD..."

@@ -25,9 +25,9 @@
 
 ## 🏗️ Architecture
 
-- **Backend**: Rust with Actix-web for HTTP/WebSocket serving
+- **Backend**: Rust with Actix-web for HTTP/WebSocket serving (connects to MPD as client)
 - **Frontend**: React + TypeScript PWA built with Vite
-- **Streaming**: Music Player Daemon (MPD) for audio playback and HTTP streaming
+- **Streaming**: Music Player Daemon (MPD) for audio playback and HTTP streaming (separate service)
 - **Real-time**: WebSocket for live queue and track updates
 
 ## 📋 Prerequisites
@@ -48,36 +48,46 @@ Before you begin, ensure you have the following installed:
 
 ## 🚀 Quick Start
 
-### Option 1: Development Script (Easiest)
+### Option 1: Docker (Recommended)
+
+```bash
+# Start MPD service
+docker compose up -d mpd
+
+# Start backend (in another terminal)
+cd backend
+cargo run
+```
+
+### Option 2: Local Development
+
+#### 1. Start MPD Locally
 
 ```bash
 cd backend
-./start-dev.sh
+
+# Create MPD config from example (first time only)
+cp mpd.conf.example mpd.conf
+# Edit mpd.conf if needed
+
+# Start MPD
+mpd mpd.conf
 ```
 
-This will automatically:
-- Generate the MPD configuration
-- Start MPD with the generated config
-- Start the backend server
+Or use the development script:
+```bash
+cd backend
+./start-dev.sh  # Starts MPD and backend
+```
 
-### Option 2: Manual Start
-
-#### 1. Start Backend
+#### 2. Start Backend
 
 ```bash
 cd backend
 cargo run
 ```
 
-This generates `mpd.conf` from the template with appropriate paths.
-Backend starts on `http://localhost:8080`
-
-#### 2. Start MPD
-
-```bash
-cd backend
-mpd mpd.conf
-```
+Backend starts on `http://localhost:8080` and connects to MPD at `127.0.0.1:6600`
 
 #### 3. Start Frontend
 
@@ -108,10 +118,12 @@ muchas-radio/
 │   │   ├── models.rs
 │   │   └── state.rs
 │   ├── uploads/         # Uploaded music files (gitignored)
-│   ├── playlists/       # MPD playlists
-│   ├── mpd.conf.template # MPD configuration template
+│   ├── mpd.conf.example # MPD configuration example (for local dev)
 │   ├── start-dev.sh     # Development startup script
 │   └── Cargo.toml
+│
+├── mpd/                 # MPD Docker container
+│   └── Dockerfile       # MPD service configuration
 │
 └── frontend/            # React TypeScript PWA
     ├── src/
@@ -135,29 +147,39 @@ muchas-radio/
 
 ## ⚙️ Configuration
 
+### Music Storage Setup
+
+The backend and MPD containers share the same music storage. By default, Docker named volumes are used, but you can configure bind mounts for easier access.
+
+**Current Setup:**
+- Backend writes to: `/app/uploads` (mounted from `music-uploads` volume)
+- MPD reads from: `/music` (mounted from same `music-uploads` volume)
+- Both containers share the same data
+
+**For production or easier file access:**
+- Use bind mounts by setting `MUSIC_STORAGE_PATH` environment variable
+- Default: `./data/music` (relative to docker-compose.yml)
+- Example: `export MUSIC_STORAGE_PATH=/var/muchas-radio/music && docker compose up -d`
+
 ### Backend Environment Variables
 
-**MPD Configuration:**
-- `MPD_BASE_DIR` - Base directory for MPD files (default: current directory)
-- `MPD_MUSIC_DIR` - Music files directory (default: `$MPD_BASE_DIR/uploads`)
-- `MPD_PLAYLIST_DIR` - Playlists directory (default: `$MPD_BASE_DIR/playlists`)
-- `MPD_DATA_DIR` - MPD data directory (default: `$MPD_BASE_DIR`)
-- `MPD_BIND_ADDRESS` - MPD bind address (default: 127.0.0.1)
+**MPD Connection:**
+- `MPD_HOST` - MPD server hostname/IP to connect to (default: 127.0.0.1)
 - `MPD_PORT` - MPD server port (default: 6600)
-- `MPD_STREAM_PORT` - HTTP streaming port (default: 8001)
 
 **Backend API:**
-- `MPD_HOST` - MPD server host (default: 127.0.0.1)
 - `BIND_ADDR` - HTTP server address (default: 127.0.0.1:8080)
 - `RUST_LOG` - Log level (default: info)
 
 **Production Example:**
 ```bash
-export MPD_BASE_DIR=/var/lib/muchas-radio
-export MPD_BIND_ADDRESS=0.0.0.0
+export MPD_HOST=mpd  # Use service name in Docker, or IP/hostname otherwise
+export MPD_PORT=6600
 export BIND_ADDR=0.0.0.0:8080
 cargo run --release
 ```
+
+**Note**: In Docker deployments, MPD runs in a separate container. The backend connects to it via `MPD_HOST=mpd` (the service name).
 
 ### Frontend Environment Variables
 
@@ -222,9 +244,18 @@ docker compose logs -f
 
 Once deployed, you'll have:
 - **Frontend**: Port 3000 (nginx serving React app)
-- **Backend API**: Port 8080
-- **MPD Server**: Port 6600 (internal)
-- **Audio Stream**: Port 8001 (internal)
+- **Backend API**: Port 8080 (connects to MPD service)
+- **MPD Server**: Port 6600 (separate container, internal network)
+- **Audio Stream**: Port 8001 (from MPD container, internal network)
+
+#### Storage
+
+Music files are stored in a shared Docker volume (`music-uploads`) accessible by both backend and MPD containers:
+- Backend writes to: `/app/uploads`
+- MPD reads from: `/music`
+- Both point to the same volume
+
+For production deployments, consider using bind mounts to a host directory by setting the `MUSIC_STORAGE_PATH` environment variable (default: `./data/music`).
 
 #### Update Deployment
 
@@ -279,8 +310,10 @@ npm run lint     # Run linter
 ### Backend Won't Connect
 
 **Error**: `Failed to connect to MPD`
-- Ensure MPD is running: `mpd backend/mpd.conf`
-- Check logs: `tail -f backend/mpd.log`
+- Ensure MPD is running: `mpd backend/mpd.conf` (development) or check Docker service: `docker compose ps mpd`
+- Verify MPD_HOST and MPD_PORT environment variables are correct
+- In Docker: ensure the `mpd` service is running and the backend can reach it on the Docker network
+- Check logs: `tail -f backend/mpd.log` (development) or `docker compose logs mpd` (Docker)
 
 ### No Audio Playing
 
