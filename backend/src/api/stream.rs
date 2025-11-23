@@ -7,6 +7,7 @@ use tokio::time::{interval, Duration};
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::state::{AppState, SessionWrapper};
+use crate::mpd_manager::get_queue;
 
 #[get("/api/ws")]
 pub async fn websocket(
@@ -92,10 +93,30 @@ pub async fn stream_proxy(state: web::Data<AppState>) -> Result<HttpResponse> {
     use actix_web::body::BodyStream;
     use futures::stream::StreamExt;
     
+    // Check if queue is empty before attempting to connect
+    match get_queue(&state).await {
+        Ok(queue) if queue.is_empty() => {
+            info!("Stream requested but queue is empty");
+            return Ok(HttpResponse::ServiceUnavailable().json(serde_json::json!({
+                "error": "No music in queue",
+                "message": "The stream is unavailable because there are no tracks in the queue. Please upload and add music to the queue first."
+            })));
+        }
+        Err(e) => {
+            error!("Failed to check queue status: {}", e);
+            // Continue to try connecting anyway
+        }
+        _ => {
+            // Queue has items, proceed with stream connection
+        }
+    }
+    
     // Get MPD stream URL from environment or use default
     let mpd_host = std::env::var("MPD_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let stream_port = std::env::var("MPD_STREAM_PORT").unwrap_or_else(|_| "8001".to_string());
     let stream_url = format!("http://{}:{}", mpd_host, stream_port);
+    
+    info!("Attempting to connect to MPD stream at: {}", stream_url);
     
     // Use shared HTTP client instead of creating a new one each time
     match state.http_client.get(&stream_url).send().await {
@@ -123,9 +144,26 @@ pub async fn stream_proxy(state: web::Data<AppState>) -> Result<HttpResponse> {
             Ok(builder.body(BodyStream::new(stream)))
         }
         Err(e) => {
-            error!("Failed to connect to MPD stream: {}", e);
+            error!("Failed to connect to MPD stream at {}: {}", stream_url, e);
+            
+            // Check if it's a connection refused error (common when queue is empty)
+            let error_msg = e.to_string();
+            let is_connection_error = error_msg.contains("Connection refused") 
+                || error_msg.contains("Failed to connect")
+                || error_msg.contains("Couldn't connect");
+            
+            let message = if is_connection_error {
+                "Cannot connect to MPD stream. This usually happens when the queue is empty or no music is playing. Please add music to the queue first."
+            } else {
+                &error_msg
+            };
+            
             Ok(HttpResponse::ServiceUnavailable().json(serde_json::json!({
-                "error": "Stream unavailable"
+                "error": "Stream unavailable",
+                "message": message,
+                "details": format!("Cannot connect to MPD stream at {}: {}", stream_url, e),
+                "mpd_host": mpd_host,
+                "stream_port": stream_port
             })))
         }
     }

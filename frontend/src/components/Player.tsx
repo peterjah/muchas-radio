@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { getStreamUrl } from '../api/client';
+import { useRadio } from '../hooks/useRadio';
 import { cn } from '../lib/utils';
 
 interface PlayerProps {
@@ -12,9 +13,11 @@ export const Player: React.FC<PlayerProps> = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isBuffering, setIsBuffering] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [userStarted, setUserStarted] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
+  const { queue } = useRadio();
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -33,6 +36,12 @@ export const Player: React.FC<PlayerProps> = () => {
       console.error('Audio error details:', audio.error);
       setHasError(true);
       setIsBuffering(false);
+      // Set a helpful error message based on queue status
+      if (queue.length === 0) {
+        setErrorMessage('No music in queue. Please upload and add music to the queue first.');
+      } else {
+        setErrorMessage('Stream error. Please check if music is playing.');
+      }
     };
     const handleLoadStart = () => {
       console.log('Audio: load start');
@@ -87,11 +96,20 @@ export const Player: React.FC<PlayerProps> = () => {
     }
   }, [volume, isMuted]);
 
-  const handlePlay = () => {
+  const handlePlay = async () => {
+    // Check if queue is empty before attempting to play
+    if (queue.length === 0) {
+      setHasError(true);
+      setErrorMessage('No music in queue. Please upload and add music to the queue first.');
+      return;
+    }
+
     if (audioRef.current) {
       console.log('User clicked play, stream URL:', getStreamUrl());
       setUserStarted(true);
       setIsBuffering(true);
+      setHasError(false);
+      setErrorMessage(null);
       
       // Set the source and load the stream
       audioRef.current.src = getStreamUrl();
@@ -103,6 +121,19 @@ export const Player: React.FC<PlayerProps> = () => {
           audioRef.current.play().catch((err) => {
             console.error('Failed to play:', err);
             setHasError(true);
+            // Try to get error message from backend
+            fetch(getStreamUrl())
+              .then(res => res.json().catch(() => null))
+              .then(errorData => {
+                if (errorData?.message) {
+                  setErrorMessage(errorData.message);
+                } else {
+                  setErrorMessage('Failed to start playback. Please check if music is playing.');
+                }
+              })
+              .catch(() => {
+                setErrorMessage('Failed to start playback. Please check if music is in the queue.');
+              });
             setIsBuffering(false);
           });
         }
@@ -245,9 +276,9 @@ export const Player: React.FC<PlayerProps> = () => {
           className="text-center mt-6"
         >
           {hasError && (
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
-              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-              Stream error - Check if MPD is running
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-50 border border-red-200 text-red-700 text-sm font-medium max-w-md text-center">
+              <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse flex-shrink-0" />
+              <span>{errorMessage || 'Stream error - Check if MPD is running'}</span>
             </div>
           )}
           {userStarted && !isBuffering && !hasError && (

@@ -91,7 +91,7 @@ MUSIC_DIR=$(realpath "$MUSIC_STORAGE_PATH" 2>/dev/null || echo "$MUSIC_STORAGE_P
 if [ ! -d "$MUSIC_DIR" ]; then
     echo "   Creating directory: $MUSIC_DIR"
     mkdir -p "$MUSIC_DIR"
-    chmod 755 "$MUSIC_DIR"
+    sudo chmod 755 "$MUSIC_DIR"
     echo "   ✅ Directory created"
 else
     echo "   ✅ Directory exists: $MUSIC_DIR"
