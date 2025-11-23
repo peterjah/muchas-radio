@@ -14,14 +14,41 @@ sticker_file       "./sticker.sql"
 bind_to_address    "127.0.0.1"
 port               "6600"
 
-# HTTP Stream Output
+# HTTP Stream Outputs - Multiple quality levels
+# Low quality stream (128 kbps) - optimized for bandwidth
 audio_output {
     type            "httpd"
-    name            "HTTP Stream"
+    name            "HTTP Stream Low"
     encoder         "lame"
     port            "8001"
     bind_to_address "127.0.0.1"
+    bitrate         "128"
+    format          "44100:16:2"
+    always_on       "yes"
+    tags            "yes"
+}
+
+# Medium quality stream (192 kbps) - default, balanced quality
+audio_output {
+    type            "httpd"
+    name            "HTTP Stream Medium"
+    encoder         "lame"
+    port            "8002"
+    bind_to_address "127.0.0.1"
     bitrate         "192"
+    format          "44100:16:2"
+    always_on       "yes"
+    tags            "yes"
+}
+
+# High quality stream (320 kbps) - maximum quality
+audio_output {
+    type            "httpd"
+    name            "HTTP Stream High"
+    encoder         "lame"
+    port            "8003"
+    bind_to_address "127.0.0.1"
+    bitrate         "320"
     format          "44100:16:2"
     always_on       "yes"
     tags            "yes"
@@ -31,6 +58,8 @@ audio_output {
 auto_update         "yes"
 auto_update_depth   "3"
 
-# Performance
-max_output_buffer_size  "16384"
+# Performance - Optimized buffer settings for smooth streaming
+max_output_buffer_size  "32768"  # Increased from 16384 for better buffering
+audio_buffer_size       "4096"   # Internal audio buffer (in KB)
+buffer_before_play      "25%"    # Fill 25% of buffer before starting playback
 

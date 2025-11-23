@@ -89,7 +89,10 @@ pub async fn websocket(
 }
 
 #[get("/api/stream")]
-pub async fn stream_proxy(state: web::Data<AppState>) -> Result<HttpResponse> {
+pub async fn stream_proxy(
+    req: HttpRequest,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse> {
     use actix_web::body::BodyStream;
     use futures::stream::StreamExt;
     
@@ -111,9 +114,33 @@ pub async fn stream_proxy(state: web::Data<AppState>) -> Result<HttpResponse> {
         }
     }
     
+    // Get quality parameter from query string (low, medium, high)
+    // Default to "medium" if not specified
+    let quality = req
+        .uri()
+        .query()
+        .and_then(|q| {
+            q.split('&')
+                .find_map(|pair| {
+                    let mut parts = pair.split('=');
+                    if parts.next() == Some("quality") {
+                        parts.next().map(|v| v.to_string())
+                    } else {
+                        None
+                    }
+                })
+        })
+        .unwrap_or_else(|| "medium".to_string());
+    
+    // Map quality to port: low=8001, medium=8002, high=8003
+    let stream_port = match quality.as_str() {
+        "low" => "8001",
+        "high" => "8003",
+        "medium" | _ => "8002", // default to medium
+    };
+    
     // Get MPD stream URL from environment or use default
     let mpd_host = std::env::var("MPD_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let stream_port = std::env::var("MPD_STREAM_PORT").unwrap_or_else(|_| "8001".to_string());
     let stream_url = format!("http://{}:{}", mpd_host, stream_port);
     
     info!("Attempting to connect to MPD stream at: {}", stream_url);
@@ -123,15 +150,23 @@ pub async fn stream_proxy(state: web::Data<AppState>) -> Result<HttpResponse> {
         Ok(response) => {
             let mut builder = HttpResponse::Ok();
             
-            // Copy content-type header
+            // Copy content-type header, default to audio/mpeg if not set
             if let Some(content_type) = response.headers().get("content-type") {
                 if let Ok(content_type_str) = content_type.to_str() {
                     builder.insert_header(("content-type", content_type_str));
                 }
+            } else {
+                // Default to MP3 MIME type for LAME encoder
+                builder.insert_header(("content-type", "audio/mpeg"));
             }
             
-            // Add CORS headers
+            // Optimize headers for streaming
             builder.insert_header(("Access-Control-Allow-Origin", "*"));
+            builder.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"));
+            builder.insert_header(("Pragma", "no-cache"));
+            builder.insert_header(("Connection", "keep-alive"));
+            builder.insert_header(("Accept-Ranges", "none")); // Streaming doesn't support range requests
+            builder.insert_header(("X-Content-Type-Options", "nosniff"));
             
             // Stream the response
             let stream = response.bytes_stream().map(|result| {

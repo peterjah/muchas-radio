@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react';
-import { getStreamUrl } from '../api/client';
+import { getStreamUrl, type StreamQuality } from '../api/client';
 import { useRadio } from '../hooks/useRadio';
 import { cn } from '../lib/utils';
 
 interface PlayerProps {
   isPlaying?: boolean;
 }
+
+const STREAM_QUALITY_KEY = 'muchas-radio-stream-quality';
 
 export const Player: React.FC<PlayerProps> = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -17,6 +19,16 @@ export const Player: React.FC<PlayerProps> = () => {
   const [userStarted, setUserStarted] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
+  
+  // Load quality preference from localStorage, default to 'medium'
+  const [quality, setQuality] = useState<StreamQuality>(() => {
+    const saved = localStorage.getItem(STREAM_QUALITY_KEY);
+    if (saved === 'low' || saved === 'medium' || saved === 'high') {
+      return saved as StreamQuality;
+    }
+    return 'medium';
+  });
+  
   const { queue } = useRadio();
 
   useEffect(() => {
@@ -105,14 +117,14 @@ export const Player: React.FC<PlayerProps> = () => {
     }
 
     if (audioRef.current) {
-      console.log('User clicked play, stream URL:', getStreamUrl());
+      console.log('User clicked play, stream URL:', getStreamUrl(quality));
       setUserStarted(true);
       setIsBuffering(true);
       setHasError(false);
       setErrorMessage(null);
       
       // Set the source and load the stream
-      audioRef.current.src = getStreamUrl();
+      audioRef.current.src = getStreamUrl(quality);
       audioRef.current.load();
       
       // Small delay to ensure load is initiated
@@ -122,7 +134,7 @@ export const Player: React.FC<PlayerProps> = () => {
             console.error('Failed to play:', err);
             setHasError(true);
             // Try to get error message from backend
-            fetch(getStreamUrl())
+            fetch(getStreamUrl(quality))
               .then(res => res.json().catch(() => null))
               .then(errorData => {
                 if (errorData?.message) {
@@ -150,6 +162,31 @@ export const Player: React.FC<PlayerProps> = () => {
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
+  };
+
+  const handleQualityChange = (newQuality: StreamQuality) => {
+    if (newQuality === quality) return;
+    
+    // Save to localStorage
+    localStorage.setItem(STREAM_QUALITY_KEY, newQuality);
+    setQuality(newQuality);
+    
+    // If currently playing, restart with new quality
+    if (userStarted && audioRef.current) {
+      const wasPlaying = !audioRef.current.paused;
+      audioRef.current.src = getStreamUrl(newQuality);
+      audioRef.current.load();
+      
+      if (wasPlaying) {
+        setTimeout(() => {
+          if (audioRef.current) {
+            audioRef.current.play().catch((err) => {
+              console.error('Failed to play after quality change:', err);
+            });
+          }
+        }, 100);
+      }
+    }
   };
 
   return (
@@ -188,7 +225,7 @@ export const Player: React.FC<PlayerProps> = () => {
 
       <audio
         ref={audioRef}
-        src={userStarted ? getStreamUrl() : undefined}
+        src={userStarted ? getStreamUrl(quality) : undefined}
         autoPlay={false}
         preload="auto"
         crossOrigin="anonymous"
@@ -233,6 +270,27 @@ export const Player: React.FC<PlayerProps> = () => {
               </>
             )}
           </motion.button>
+        </div>
+
+        {/* Quality selector */}
+        <div className="flex items-center justify-center gap-2 mt-4 mb-2">
+          <span className="text-sm text-[var(--color-tropical-dark)]/70 font-medium">Quality:</span>
+          <div className="flex gap-1 bg-white/50 rounded-lg p-1">
+            {(['low', 'medium', 'high'] as StreamQuality[]).map((q) => (
+              <button
+                key={q}
+                onClick={() => handleQualityChange(q)}
+                className={cn(
+                  'px-3 py-1 rounded text-sm font-medium transition-all',
+                  quality === q
+                    ? 'bg-[var(--color-tropical-gold)] text-[var(--color-tropical-dark)] shadow-sm'
+                    : 'text-[var(--color-tropical-dark)]/60 hover:text-[var(--color-tropical-dark)] hover:bg-white/50'
+                )}
+              >
+                {q === 'low' ? '128 kbps' : q === 'medium' ? '192 kbps' : '320 kbps'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Volume control */}

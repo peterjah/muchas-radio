@@ -43,7 +43,9 @@ export const addToQueue = async (trackId: string): Promise<void> => {
   await api.post('/api/queue/add', { track_id: trackId });
 };
 
-export const getStreamUrl = (): string => {
-  return `${API_BASE_URL}/api/stream`;
+export type StreamQuality = 'low' | 'medium' | 'high';
+
+export const getStreamUrl = (quality: StreamQuality = 'medium'): string => {
+  return `${API_BASE_URL}/api/stream?quality=${quality}`;
 };
 

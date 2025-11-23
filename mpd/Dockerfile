@@ -1,6 +1,6 @@
 FROM alpine:latest
 
-# Install MPD and lame encoder
+# Install MPD and LAME encoder
 RUN apk add --no-cache \
     mpd \
     mpc \
@@ -21,7 +21,7 @@ RUN chown -R mpd:audio /music /var/lib/mpd /var/log/mpd
 
 USER mpd
 
-EXPOSE 6600 8001
+EXPOSE 6600 8001 8002 8003
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
 

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MPD - Music Player Daemon
   mpd:
@@ -10,7 +8,9 @@ services:
     restart: unless-stopped
     ports:
       - "6600:6600"  # MPD control port
-      - "8001:8001"  # HTTP stream port
+      - "8001:8001"  # HTTP stream port (low quality - 128 kbps)
+      - "8002:8002"  # HTTP stream port (medium quality - 192 kbps)
+      - "8003:8003"  # HTTP stream port (high quality - 320 kbps)
     volumes:
       - mpd-data:/var/lib/mpd
       - music-uploads:/music
