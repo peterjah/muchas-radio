@@ -2,6 +2,7 @@ use crate::models::{CurrentTrack, PlaybackState, QueueItem, Track};
 use crate::state::AppState;
 use log::{error, info};
 use mpd_client::commands;
+use mpd_client::commands::SongPosition;
 use mpd_client::responses::{PlayState, SongInQueue};
 use mpd_client::tag::Tag;
 use std::path::Path;
@@ -161,6 +162,42 @@ pub async fn start_mpd_monitor(state: AppState) {
             
             match get_current_track(&state).await {
                 Ok(current) => {
+                    // Check if playlist has ended (stopped state with no current track but queue has items)
+                    if current.state == PlaybackState::Stopped && current.track.is_none() {
+                        // Check if there are tracks in the queue and restart from the beginning
+                        {
+                            let client = state.mpd_client.lock().await;
+                            let queue = client
+                                .command(commands::Queue)
+                                .await;
+                            
+                            match queue {
+                                Ok(queue_vec) => {
+                                    if !queue_vec.is_empty() {
+                                        // Play the first song (position 0)
+                                        if let Err(e) = client.command(commands::Play::song(SongPosition(0))).await {
+                                            error!("Failed to restart playlist: {}", e);
+                                        } else {
+                                            info!("Playlist ended, restarting from beginning");
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Failed to get queue: {}", e);
+                                }
+                            }
+                        }
+                        // Get updated current track after restart
+                        if let Ok(updated_current) = get_current_track(&state).await {
+                            let message = serde_json::json!({
+                                "type": "current_track",
+                                "data": updated_current
+                            });
+                            state.broadcast_message(&message.to_string()).await;
+                            continue;
+                        }
+                    }
+                    
                     let message = serde_json::json!({
                         "type": "current_track",
                         "data": current

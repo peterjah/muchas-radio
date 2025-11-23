@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getCurrentTrack, getQueue } from '../api/client';
 import { useWebSocket } from './useWebSocket';
@@ -18,7 +19,7 @@ export const useRadio = () => {
     refetchInterval: 10000, // Fallback polling
   });
 
-  const handleWebSocketMessage = (message: WebSocketMessage) => {
+  const handleWebSocketMessage = useCallback((message: WebSocketMessage) => {
     console.log('WebSocket message:', message);
     
     switch (message.type) {
@@ -29,7 +30,7 @@ export const useRadio = () => {
         queryClient.invalidateQueries({ queryKey: ['queue'] });
         break;
     }
-  };
+  }, [queryClient]);
 
   const { isConnected } = useWebSocket(handleWebSocketMessage);
 

@@ -55,5 +55,10 @@ impl AppState {
         let mut sessions = self.ws_sessions.lock().await;
         sessions.retain(|wrapper| wrapper.id != session_id);
     }
+    
+    pub async fn get_session_count(&self) -> usize {
+        let sessions = self.ws_sessions.lock().await;
+        sessions.len()
+    }
 }
 

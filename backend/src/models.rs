@@ -26,7 +26,7 @@ pub struct CurrentTrack {
     pub state: PlaybackState,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum PlaybackState {
     Playing,

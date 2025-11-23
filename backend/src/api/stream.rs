@@ -14,10 +14,19 @@ pub async fn websocket(
     body: web::Payload,
     state: web::Data<AppState>,
 ) -> Result<HttpResponse> {
+    // Check connection limit before accepting
+    const MAX_CONNECTIONS: usize = 100;
+    let current_count = state.get_session_count().await;
+    if current_count >= MAX_CONNECTIONS {
+        error!("WebSocket connection limit reached: {}/{}", current_count, MAX_CONNECTIONS);
+        return Ok(HttpResponse::ServiceUnavailable()
+            .json(serde_json::json!({"error": "Too many connections"})));
+    }
+    
     let (response, mut session, msg_stream) = actix_ws::handle(&req, body)?;
     
     let session_id = Uuid::new_v4();
-    info!("WebSocket connection established: {}", session_id);
+    info!("WebSocket connection established: {} (total: {})", session_id, current_count + 1);
     
     // Add session to state with unique ID
     {
