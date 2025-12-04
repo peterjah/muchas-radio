@@ -9,16 +9,5 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-// Register service worker for PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(
-      (registration) => {
-        console.log('ServiceWorker registration successful:', registration);
-      },
-      (error) => {
-        console.log('ServiceWorker registration failed:', error);
-      }
-    );
-  });
-}
+// Service worker registration is handled by VitePWA plugin
+// No manual registration needed

@@ -8,7 +8,13 @@ const getWebSocketUrl = (): string => {
     return envUrl;
   }
   
-  // If no env var, use relative URL based on current page protocol
+  // Default to backend server in dev mode (localhost:8080)
+  // In production, this should be set via VITE_WS_URL env var
+  if (import.meta.env.DEV) {
+    return 'ws://localhost:8080';
+  }
+  
+  // If no env var in production, use relative URL based on current page protocol
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
   return `${protocol}//${host}`;

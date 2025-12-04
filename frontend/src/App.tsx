@@ -8,6 +8,7 @@ import { NowPlaying } from './components/NowPlaying';
 import { Queue } from './components/Queue';
 import { UploadForm } from './components/UploadForm';
 import { UsernameModal } from './components/UsernameModal';
+import { InstallButton } from './components/InstallButton';
 import { useRadio } from './hooks/useRadio';
 import muchasLogo from './assets/muchas_logo.png';
 import { cn } from './lib/utils';
@@ -74,7 +75,9 @@ function RadioApp() {
             </div>
 
             {/* User info and status */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap justify-center">
+              <InstallButton />
+              
               {username && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
