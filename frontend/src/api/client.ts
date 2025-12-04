@@ -1,7 +1,18 @@
 import axios from 'axios';
 import type { CurrentTrack, QueueItem, UploadResponse } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+// Use protocol-relative API URL - automatically uses https:// for HTTPS pages
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+  
+  // If no env var, use relative URL (same origin)
+  return '';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,

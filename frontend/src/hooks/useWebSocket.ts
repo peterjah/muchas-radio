@@ -1,7 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { WebSocketMessage } from '../types';
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
+// Use protocol-relative WebSocket URL - automatically uses wss:// for HTTPS pages
+const getWebSocketUrl = (): string => {
+  const envUrl = import.meta.env.VITE_WS_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+  
+  // If no env var, use relative URL based on current page protocol
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}`;
+};
+
+const WS_URL = getWebSocketUrl();
 
 export const useWebSocket = (onMessage: (message: WebSocketMessage) => void) => {
   const [isConnected, setIsConnected] = useState(false);

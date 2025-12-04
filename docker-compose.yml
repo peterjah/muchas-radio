@@ -56,8 +56,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
-        VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8080}
+        # Use empty strings for relative URLs (same origin) - automatically uses HTTPS/WSS when served over HTTPS
+        # Or set to absolute URLs like https://muchasradio.com and wss://muchasradio.com
+        VITE_API_URL: ${VITE_API_URL:-}
+        VITE_WS_URL: ${VITE_WS_URL:-}
     container_name: muchas-frontend
     restart: unless-stopped
     ports:
@@ -79,9 +81,12 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot-www:/var/www/certbot:ro
+      - certbot-conf:/etc/letsencrypt:ro
     depends_on:
       - frontend
       - backend
@@ -92,6 +97,21 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # Certbot - SSL certificate management (runs in background for auto-renewal)
+  certbot:
+    image: certbot/certbot:latest
+    container_name: muchas-certbot
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-conf:/etc/letsencrypt
+    networks:
+      - muchas-network
+    # Only start this container after initial certificates are obtained
+    # For one-off certbot commands, use: docker compose run --rm --entrypoint="" certbot certbot ...
+    profiles:
+      - ssl-renewal
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
 volumes:
   mpd-data:
@@ -106,6 +126,10 @@ volumes:
       o: bind
       device: ${MUSIC_STORAGE_PATH:-./data/music}
   backend-data:
+    driver: local
+  certbot-www:
+    driver: local
+  certbot-conf:
     driver: local
 
 networks:

@@ -1,32 +1,30 @@
-upstream frontend {
-    server frontend:80;
-}
+# HTTPS server configuration
+# Copy this file to muchas-radio-ssl.conf after SSL certificates are obtained
+# Note: upstream and map definitions are in muchas-radio.conf, don't duplicate them here
 
-upstream backend {
-    server backend:8080;
-}
-
-# Map for WebSocket upgrade
-map $http_upgrade $connection_upgrade {
-    default upgrade;
-    '' close;
-}
-
-# HTTP server - serves content initially, redirects to HTTPS after SSL is set up
+# HTTPS server
 server {
-    listen 80;
+    listen 443 ssl;
+    http2 on;
     server_name muchasradio.com www.muchasradio.com;
 
-    # Let's Encrypt validation
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
+    # SSL configuration
+    ssl_certificate /etc/letsencrypt/live/muchasradio.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/muchasradio.com/privkey.pem;
+    
+    # Modern SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384';
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    ssl_session_tickets off;
 
-    # Serve content over HTTP initially (before SSL certificates are obtained)
-    # After SSL is set up, uncomment the redirect below and comment out the proxy_pass
-    # location / {
-    #     return 301 https://$host$request_uri;
-    # }
+    # Security headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
 
     client_max_body_size 100M;
 
