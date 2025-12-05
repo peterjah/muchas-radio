@@ -1,8 +1,9 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Radio } from 'lucide-react';
+import { User, Radio, FileText } from 'lucide-react';
 import muchasLogo from '../assets/muchas_logo.png';
 import { cn } from '../lib/utils';
+import { TermsAndConditions } from './TermsAndConditions';
 
 interface UsernameModalProps {
   onUsernameSet: (username: string) => void;
@@ -11,21 +12,30 @@ interface UsernameModalProps {
 export const UsernameModal: React.FC<UsernameModalProps> = ({ onUsernameSet }) => {
   const [username, setUsername] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem('username');
-    if (!stored) {
+    const storedUsername = localStorage.getItem('username');
+    const storedTermsAccepted = localStorage.getItem('termsAccepted') === 'true';
+    
+    if (!storedUsername || !storedTermsAccepted) {
       setShowModal(true);
+      // If username exists but terms not accepted, pre-fill username
+      if (storedUsername) {
+        setUsername(storedUsername);
+      }
     } else {
-      onUsernameSet(stored);
+      onUsernameSet(storedUsername);
     }
   }, [onUsernameSet]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (username.trim()) {
+    if (username.trim() && acceptedTerms) {
       const trimmedUsername = username.trim();
       localStorage.setItem('username', trimmedUsername);
+      localStorage.setItem('termsAccepted', 'true');
       onUsernameSet(trimmedUsername);
       setShowModal(false);
     }
@@ -147,6 +157,40 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({ onUsernameSet }) =
                 />
               </div>
 
+              {/* Terms and Conditions Checkbox */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.55 }}
+                className="flex items-start gap-3 p-4 rounded-xl bg-white/60 border-2 border-black/5"
+              >
+                <input
+                  type="checkbox"
+                  id="acceptTerms"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-1 w-5 h-5 rounded border-2 border-[var(--color-tropical-gold)] text-[var(--color-tropical-gold)] focus:ring-2 focus:ring-[var(--color-tropical-gold)]/20 cursor-pointer"
+                  required
+                />
+                <label
+                  htmlFor="acceptTerms"
+                  className="flex-1 text-sm text-[var(--color-tropical-dark)] cursor-pointer leading-relaxed"
+                >
+                  I accept the{' '}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setShowTermsModal(true);
+                    }}
+                    className="text-[var(--color-tropical-orange)] font-semibold underline hover:text-[var(--color-tropical-gold)] transition-colors inline-flex items-center gap-1"
+                  >
+                    Terms and Conditions
+                    <FileText className="w-3 h-3" />
+                  </button>
+                </label>
+              </motion.div>
+
               <motion.button
                 type="submit"
                 whileHover={{ scale: 1.02 }}
@@ -159,7 +203,7 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({ onUsernameSet }) =
                   'transition-all duration-200',
                   'disabled:opacity-50 disabled:cursor-not-allowed'
                 )}
-                disabled={!username.trim()}
+                disabled={!username.trim() || !acceptedTerms}
               >
                 Start Listening 🎵
               </motion.button>
@@ -177,6 +221,9 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({ onUsernameSet }) =
           </div>
         </motion.div>
       </motion.div>
+      
+      {/* Terms and Conditions Modal */}
+      <TermsAndConditions isOpen={showTermsModal} onClose={() => setShowTermsModal(false)} />
     </AnimatePresence>
   );
 };
