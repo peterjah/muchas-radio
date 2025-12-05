@@ -11,7 +11,32 @@ use crate::mpd_manager::add_file_to_mpd;
 use crate::state::AppState;
 
 const MAX_FILE_SIZE: usize = 100 * 1024 * 1024; // 100 MB
-const MAX_TOTAL_STORAGE: u64 = 300 * 1024 * 1024; // 300 MB total storage limit
+const DEFAULT_MAX_TOTAL_STORAGE: u64 = 300 * 1024 * 1024; // 300 MB default total storage limit
+
+/// Get the maximum total storage size from environment variable or use default
+/// Environment variable: MAX_TOTAL_STORAGE (in bytes, or with suffix like "500MB", "1GB")
+fn get_max_total_storage() -> u64 {
+    match std::env::var("MAX_TOTAL_STORAGE") {
+        Ok(val) => {
+            // Try to parse as number with optional suffix
+            let val = val.trim().to_uppercase();
+            if let Some(mb_pos) = val.find("MB") {
+                if let Ok(num) = val[..mb_pos].trim().parse::<u64>() {
+                    return num * 1024 * 1024;
+                }
+            } else if let Some(gb_pos) = val.find("GB") {
+                if let Ok(num) = val[..gb_pos].trim().parse::<u64>() {
+                    return num * 1024 * 1024 * 1024;
+                }
+            } else if let Ok(num) = val.parse::<u64>() {
+                return num;
+            }
+            warn!("Invalid MAX_TOTAL_STORAGE format: '{}', using default", val);
+            DEFAULT_MAX_TOTAL_STORAGE
+        }
+        Err(_) => DEFAULT_MAX_TOTAL_STORAGE,
+    }
+}
 
 /// Calculate the total size of all files in the uploads directory
 fn get_uploads_directory_size() -> std::io::Result<u64> {
@@ -69,16 +94,17 @@ fn get_oldest_file() -> std::io::Result<Option<PathBuf>> {
 
 /// Try to free up space by deleting oldest files until there's enough room
 fn free_up_space(needed_size: usize) -> std::io::Result<bool> {
+    let max_storage = get_max_total_storage();
     let mut freed = 0u64;
     let current_size = get_uploads_directory_size()?;
     let needed_total = needed_size as u64;
     
     // If already enough space, no need to delete
-    if current_size + needed_total <= MAX_TOTAL_STORAGE {
+    if current_size + needed_total <= max_storage {
         return Ok(true);
     }
     
-    let to_free = (current_size + needed_total) - MAX_TOTAL_STORAGE;
+    let to_free = (current_size + needed_total) - max_storage;
     
     info!("Need to free up {} bytes to accommodate new upload", to_free);
     
@@ -133,17 +159,18 @@ pub async fn upload_music(
             }
             
             // Check storage limit and free up space if needed
+            let max_storage = get_max_total_storage();
             match free_up_space(MAX_FILE_SIZE) {
                 Ok(true) => {
                     let current_size = get_uploads_directory_size().unwrap_or(0);
                     info!("Storage check passed. Current size: {} MB / {} MB", 
                           current_size / 1024 / 1024, 
-                          MAX_TOTAL_STORAGE / 1024 / 1024);
+                          max_storage / 1024 / 1024);
                 }
                 Ok(false) => {
                     error!("Unable to free up enough space for upload");
                     return Ok(HttpResponse::InsufficientStorage().json(serde_json::json!({
-                        "error": "Storage limit reached (300MB). Unable to free up space for new upload."
+                        "error": format!("Storage limit reached ({}MB). Unable to free up space for new upload.", max_storage / 1024 / 1024)
                     })));
                 }
                 Err(e) => {

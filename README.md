@@ -21,7 +21,7 @@
 - **👤 Simple Username System** - No registration required, just pick a name
 - **📱 Progressive Web App** - Install on mobile and desktop devices
 - **🎨 Beautiful UI** - Modern, responsive design with smooth animations
-- **🔄 Auto-cleanup** - 300MB storage with automatic deletion of oldest files
+- **🔄 Auto-cleanup** - Configurable storage limit (default: 300MB) with automatic deletion of oldest files
 
 ## 🏗️ Architecture
 
@@ -170,6 +170,7 @@ The backend and MPD containers share the same music storage. By default, Docker 
 **Backend API:**
 - `BIND_ADDR` - HTTP server address (default: 127.0.0.1:8080)
 - `RUST_LOG` - Log level (default: info)
+- `MAX_TOTAL_STORAGE` - Maximum total storage size (default: 300MB). Supports formats like "500MB", "1GB", or bytes as a number.
 
 **Production Example:**
 ```bash
@@ -196,7 +197,7 @@ cargo run --release
 
 **Storage Limits:**
 - Maximum file size: 100MB
-- Total storage: 300MB (oldest files auto-deleted when limit reached)
+- Total storage: 300MB by default (configurable via `MAX_TOTAL_STORAGE` environment variable). Oldest files are auto-deleted when limit is reached.
 
 ## 🚢 Deployment
 

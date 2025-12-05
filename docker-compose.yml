@@ -37,6 +37,7 @@ services:
       - MPD_PORT=6600
       - BIND_ADDR=0.0.0.0:8080
       - RUST_LOG=info
+      - MAX_TOTAL_STORAGE=${MAX_TOTAL_STORAGE:-300MB}
     volumes:
       - music-uploads:/app/uploads
       - backend-data:/app/data
