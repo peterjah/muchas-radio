@@ -58,6 +58,13 @@ async fn main() -> std::io::Result<()> {
     let bind_addr = env::var("BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
     info!("Starting HTTP server on {}", bind_addr);
     
+    // Determine worker count: use available CPUs, capped at 8 for reasonable resource usage
+    let num_workers = std::thread::available_parallelism()
+        .map(|p| p.get().min(8))
+        .unwrap_or(4);
+    
+    info!("Starting HTTP server with {} workers", num_workers);
+    
     HttpServer::new(move || {
         let cors = Cors::permissive();
         
@@ -73,9 +80,9 @@ async fn main() -> std::io::Result<()> {
             .service(api::stream::websocket)
             .service(api::stream::stream_proxy)
     })
-    .workers(2)  // Limit worker threads to reduce resource usage
-    .max_connections(1000)  // Limit maximum connections
-    .max_connection_rate(256)  // Limit connection rate
+    .workers(num_workers)  // Auto-detect CPU cores, capped at 8
+    .max_connections(2000)  // Increased for more concurrent stream listeners
+    .max_connection_rate(512)  // Increased connection rate for bursts
     .bind(&bind_addr)?
     .run()
     .await

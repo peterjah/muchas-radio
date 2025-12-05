@@ -39,6 +39,11 @@ server {
 
     # Audio stream endpoint - optimized for live streaming
     location /api/stream {
+        # Rate limiting: 5 new stream requests/sec with burst of 10, per IP
+        limit_req zone=stream_limit burst=10 nodelay;
+        # Connection limiting: max 10 concurrent stream connections per IP
+        limit_conn stream_conn 10;
+        
         proxy_pass http://backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -71,6 +76,9 @@ server {
 
     # Backend API - proxy to backend container
     location /api {
+        # Rate limiting for API: 30 req/sec with burst of 50
+        limit_req zone=api_limit burst=50 nodelay;
+        
         proxy_pass http://backend;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
