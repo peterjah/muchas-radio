@@ -18,8 +18,8 @@ export const UploadForm: React.FC = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      toast.success('Track added to queue!', {
-        description: 'Your music will play soon 🎵',
+      toast.success('Track will play next!', {
+        description: 'Your music is up next 🎵',
         duration: 4000,
       });
     },
@@ -111,7 +111,7 @@ export const UploadForm: React.FC = () => {
             <Upload className="w-5 h-5 text-white" />
           </div>
           <h2 className="text-2xl font-bold text-[var(--color-tropical-dark)]">
-            Upload Music
+            Put the Next Track
           </h2>
         </div>
 
@@ -155,7 +155,7 @@ export const UploadForm: React.FC = () => {
                     Uploading...
                   </p>
                   <p className="text-sm text-[var(--color-text-muted)]">
-                    Adding your track to the queue
+                    Adding your track as the next track
                   </p>
                 </div>
               </motion.div>
@@ -231,7 +231,7 @@ export const UploadForm: React.FC = () => {
               <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-semibold text-green-800">Upload successful!</p>
-                <p className="text-xs text-green-700">Your track has been added to the queue</p>
+                <p className="text-xs text-green-700">Your track will play next!</p>
               </div>
             </motion.div>
           )}

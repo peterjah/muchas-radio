@@ -110,7 +110,7 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({ onUsernameSet }) =
               </h2>
               <div className="flex items-center justify-center gap-2 text-[var(--color-tropical-orange)] font-medium text-lg">
                 <Radio className="w-5 h-5" />
-                <p className="italic">Your Tropical Radio Station 🌴</p>
+                <p className="italic">A collective radio experience 🌴</p>
               </div>
             </motion.div>
 
@@ -121,9 +121,9 @@ export const UsernameModal: React.FC<UsernameModalProps> = ({ onUsernameSet }) =
               transition={{ delay: 0.4 }}
               className="text-[var(--color-text-muted)] mb-8 text-sm leading-relaxed"
             >
-              A collaborative radio where everyone listens together.
+              A collective radio where everyone shares the next track.
               <br />
-              Upload tracks, join the party, and enjoy the vibes! 🎧
+              Put your song next, join the party, and enjoy the vibes! 🎧
             </motion.p>
 
             {/* Form */}

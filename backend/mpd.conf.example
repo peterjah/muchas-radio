@@ -61,5 +61,6 @@ auto_update_depth   "3"
 # Performance - Optimized buffer settings for smooth streaming
 max_output_buffer_size  "32768"  # Increased from 16384 for better buffering
 audio_buffer_size       "4096"   # Internal audio buffer (in KB)
-buffer_before_play      "25%"    # Fill 25% of buffer before starting playback
+# Note: buffer_before_play is deprecated in newer MPD versions
+# Buffer behavior is now controlled automatically by audio_buffer_size
 

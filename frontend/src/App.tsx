@@ -69,7 +69,7 @@ function RadioApp() {
                 </h1>
                 <div className="flex items-center gap-2 text-[var(--color-tropical-orange)] font-medium">
                   <Radio className="w-4 h-4" />
-                  <p className="italic text-sm md:text-base">Your Tropical Radio Station 🌴</p>
+                  <p className="italic text-sm md:text-base">A collective radio experience 🌴</p>
                 </div>
               </div>
             </div>
@@ -147,7 +147,7 @@ function RadioApp() {
             />
             <div className="space-y-1">
               <p className="text-sm text-[var(--color-tropical-dark)] font-medium">
-                A collaborative radio experience - Everyone listens together 🎧
+                A collective radio - Share the next track, listen together 🎧
               </p>
               <p className="text-xs text-[var(--color-tropical-orange)] italic">
                 Muchas Radio © 2025 - Tropical Vibes All Day 🌴☀️

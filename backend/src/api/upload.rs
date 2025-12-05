@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::models::{Track, UploadResponse};
-use crate::mpd_manager::add_file_to_mpd;
+use crate::mpd_manager::{add_file_to_mpd, remove_last_track_from_queue};
 use crate::state::AppState;
 
 const MAX_FILE_SIZE: usize = 100 * 1024 * 1024; // 100 MB
@@ -15,7 +15,7 @@ const DEFAULT_MAX_TOTAL_STORAGE: u64 = 300 * 1024 * 1024; // 300 MB default tota
 
 /// Get the maximum total storage size from environment variable or use default
 /// Environment variable: MAX_TOTAL_STORAGE (in bytes, or with suffix like "500MB", "1GB")
-fn get_max_total_storage() -> u64 {
+pub fn get_max_total_storage() -> u64 {
     match std::env::var("MAX_TOTAL_STORAGE") {
         Ok(val) => {
             // Try to parse as number with optional suffix
@@ -39,7 +39,7 @@ fn get_max_total_storage() -> u64 {
 }
 
 /// Calculate the total size of all files in the uploads directory
-fn get_uploads_directory_size() -> std::io::Result<u64> {
+pub fn get_uploads_directory_size() -> std::io::Result<u64> {
     let uploads_dir = PathBuf::from("uploads");
     let mut total_size = 0u64;
     
@@ -160,6 +160,17 @@ pub async fn upload_music(
             
             // Check storage limit and free up space if needed
             let max_storage = get_max_total_storage();
+            let current_size = get_uploads_directory_size().unwrap_or(0);
+            
+            // Check if we need to remove the last track from queue
+            // This happens when storage is at or near maximum
+            if current_size >= max_storage {
+                info!("Storage at maximum ({} / {} bytes), removing last track from queue and deleting file", current_size, max_storage);
+                if let Err(e) = remove_last_track_from_queue(&state, true).await {
+                    warn!("Failed to remove last track from queue: {}", e);
+                }
+            }
+            
             match free_up_space(MAX_FILE_SIZE) {
                 Ok(true) => {
                     let current_size = get_uploads_directory_size().unwrap_or(0);
@@ -168,10 +179,24 @@ pub async fn upload_music(
                           max_storage / 1024 / 1024);
                 }
                 Ok(false) => {
-                    error!("Unable to free up enough space for upload");
-                    return Ok(HttpResponse::InsufficientStorage().json(serde_json::json!({
-                        "error": format!("Storage limit reached ({}MB). Unable to free up space for new upload.", max_storage / 1024 / 1024)
-                    })));
+                    // Try removing last track from queue (and deleting file) as a last resort
+                    info!("Unable to free up enough space, removing last track from queue and deleting file");
+                    if let Err(e) = remove_last_track_from_queue(&state, true).await {
+                        warn!("Failed to remove last track from queue: {}", e);
+                    }
+                    
+                    // Try freeing space again after removing from queue
+                    match free_up_space(MAX_FILE_SIZE) {
+                        Ok(true) => {
+                            info!("Successfully freed space after removing track from queue");
+                        }
+                        Ok(false) | Err(_) => {
+                            error!("Unable to free up enough space for upload even after removing track from queue");
+                            return Ok(HttpResponse::InsufficientStorage().json(serde_json::json!({
+                                "error": format!("Storage limit reached ({}MB). Unable to free up space for new upload.", max_storage / 1024 / 1024)
+                            })));
+                        }
+                    }
                 }
                 Err(e) => {
                     error!("Error checking storage: {}", e);
