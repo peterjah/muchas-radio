@@ -209,7 +209,8 @@ pub async fn upload_music(
             // Generate unique ID and sanitize filename
             let track_id = Uuid::new_v4().to_string();
             let sanitized_filename = sanitize_filename::sanitize(filename);
-            let final_filename = format!("{}_{}", track_id, sanitized_filename);
+            let sanitized_username = sanitize_filename::sanitize(&username);
+            let final_filename = format!("{}_{}_{}", track_id, sanitized_username, sanitized_filename);
             let filepath = PathBuf::from("uploads").join(&final_filename);
             
             info!("Uploading file: {} as {}", filename, final_filename);

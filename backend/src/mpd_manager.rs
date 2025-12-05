@@ -269,8 +269,30 @@ pub async fn get_queue(state: &AppState) -> Result<Vec<QueueItem>, String> {
 }
 
 
+/// Extract username from filename
+/// Expected format: {uuid}_{username}_{original_filename}
+fn extract_username_from_filename(filename: &str) -> Option<String> {
+    let file_stem = Path::new(filename)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(filename);
+    
+    // Split by underscore with limit 3 to get: [uuid, username, rest_of_filename]
+    // Format: {uuid}_{username}_{original_filename}
+    let parts: Vec<&str> = file_stem.splitn(3, '_').collect();
+    
+    if parts.len() >= 3 {
+        let username = parts[1].trim();
+        if !username.is_empty() {
+            return Some(username.to_string());
+        }
+    }
+    
+    None
+}
+
 /// Parse artist and title from filename
-/// Expected format: {uuid}_{Artist} - {Title}.mp3
+/// Expected format: {uuid}_{username}_{Artist} - {Title}.mp3
 fn parse_metadata_from_filename(filename: &str) -> (Option<String>, Option<String>) {
     // Remove file extension
     let file_stem = Path::new(filename)
@@ -278,12 +300,12 @@ fn parse_metadata_from_filename(filename: &str) -> (Option<String>, Option<Strin
         .and_then(|s| s.to_str())
         .unwrap_or(filename);
     
-    // Remove UUID prefix (everything before the first underscore)
-    let name_part = if let Some(underscore_pos) = file_stem.find('_') {
-        &file_stem[underscore_pos + 1..]
-    } else {
-        file_stem
-    };
+    // Remove UUID and username prefix (first two parts separated by underscores)
+    // Format: {uuid}_{username}_{original_filename}
+    let name_part = file_stem
+        .splitn(3, '_')
+        .nth(2)
+        .unwrap_or(file_stem);
     
     // Try to split on " - " pattern (space-dash-space)
     if let Some(dash_pos) = name_part.find(" - ") {
@@ -315,7 +337,7 @@ async fn song_in_queue_to_track(song: &SongInQueue, state: &AppState) -> Track {
         .and_then(|s| s.to_str())
         .unwrap_or(&filename);
     
-    // Extract the UUID part from the filename (format: {uuid}_{original_filename})
+    // Extract the UUID part from the filename (format: {uuid}_{username}_{original_filename})
     let track_id = file_stem
         .split('_')
         .next()
@@ -343,6 +365,10 @@ async fn song_in_queue_to_track(song: &SongInQueue, state: &AppState) -> Track {
         }
     }
     
+    // Extract uploader name from filename if not in metadata
+    let added_by = extract_username_from_filename(&filename)
+        .unwrap_or_else(|| "Unknown".to_string());
+    
     Track {
         id: track_id.clone(),
         filename: filename.clone(),
@@ -350,7 +376,7 @@ async fn song_in_queue_to_track(song: &SongInQueue, state: &AppState) -> Track {
         artist,
         album: song.song.tags.get(&Tag::Album).and_then(|t| t.first()).map(|s| s.to_string()),
         duration: song.song.duration.map(|d| d.as_secs_f64()),
-        added_by: "Unknown".to_string(),
+        added_by,
         added_at: chrono::Utc::now(),
     }
 }
