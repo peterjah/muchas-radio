@@ -123,33 +123,108 @@ export const Player: React.FC<PlayerProps> = () => {
       setHasError(false);
       setErrorMessage(null);
       
-      // Set the source and load the stream
-      audioRef.current.src = getStreamUrl(quality);
-      audioRef.current.load();
+      const audio = audioRef.current;
+      const streamUrl = getStreamUrl(quality);
       
-      // Small delay to ensure load is initiated
-      setTimeout(() => {
-        if (audioRef.current) {
-          audioRef.current.play().catch((err) => {
-            console.error('Failed to play:', err);
-            setHasError(true);
-            // Try to get error message from backend
-            fetch(getStreamUrl(quality))
-              .then(res => res.json().catch(() => null))
-              .then(errorData => {
-                if (errorData?.message) {
-                  setErrorMessage(errorData.message);
-                } else {
-                  setErrorMessage('Failed to start playback. Please check if music is playing.');
-                }
+      // Set the source and load the stream
+      audio.src = streamUrl;
+      audio.load();
+      
+      // iOS Safari/Chrome requires the audio element to be ready before calling play()
+      // Wait for canplay or canplaythrough event instead of using a timeout
+      const playAudio = (retryCount = 0) => {
+        if (!audio || !audioRef.current) return;
+        
+        // On iOS, sometimes we need to wait a bit longer even after canplay
+        const attemptPlay = () => {
+          const playPromise = audio.play();
+          
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                console.log('Playback started successfully');
+                setIsBuffering(false);
+                setHasError(false);
               })
-              .catch(() => {
-                setErrorMessage('Failed to start playback. Please check if music is in the queue.');
+              .catch((err) => {
+                console.error('Failed to play:', err);
+                
+                // Retry for certain errors or if audio isn't ready yet
+                const shouldRetry = retryCount < 3 && (
+                  err?.name === 'NotAllowedError' || 
+                  err?.message?.includes('play() request was interrupted') ||
+                  err?.message?.includes('The play() request was interrupted') ||
+                  audio.readyState === HTMLMediaElement.HAVE_NOTHING ||
+                  (audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA && retryCount < 2)
+                );
+                
+                if (shouldRetry) {
+                  const delay = retryCount === 0 ? 100 : retryCount === 1 ? 500 : 1000;
+                  console.log(`[Player] Retrying play attempt ${retryCount + 1} in ${delay}ms...`);
+                  setTimeout(() => {
+                    if (audio && audioRef.current && audio.src === streamUrl) {
+                      playAudio(retryCount + 1);
+                    }
+                  }, delay);
+                  return;
+                }
+                
+                setHasError(true);
+                setIsBuffering(false);
+                
+                // Provide better error messages based on error type
+                const errorName = err?.name || '';
+                const errorMessage = err?.message || '';
+                
+                if (errorName === 'NotAllowedError' || errorMessage.includes('play() request was interrupted')) {
+                  setErrorMessage('Playback was blocked. Please tap the play button again.');
+                } else if (errorName === 'NotSupportedError') {
+                  setErrorMessage('Audio format not supported. Please try a different quality setting.');
+                } else if (queue.length === 0) {
+                  setErrorMessage('No music in queue. Please upload and add music to the queue first.');
+                } else {
+                  // Check audio element state for more info
+                  if (audio.error) {
+                    const errorCode = audio.error.code;
+                    // MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
+                    if (errorCode === 4) {
+                      setErrorMessage('Audio format not supported. Please try a different quality setting.');
+                    } else if (errorCode === 2) {
+                      setErrorMessage('Network error. Please check your connection and try again.');
+                    } else {
+                      setErrorMessage('Failed to start playback. Please check if music is in the queue.');
+                    }
+                  } else {
+                    setErrorMessage('Failed to start playback. Please check if music is in the queue.');
+                  }
+                }
               });
-            setIsBuffering(false);
-          });
+          }
+        };
+        
+        // Small delay for iOS to ensure audio element is fully ready
+        if (retryCount === 0) {
+          setTimeout(attemptPlay, 50);
+        } else {
+          attemptPlay();
         }
-      }, 100);
+      };
+      
+      // Try playing immediately - browser will load in background
+      // This works better on desktop browsers that suspend loading
+      // For iOS, we'll retry if it fails
+      playAudio();
+      
+      // Also listen for canplay as backup (especially for iOS)
+      const onCanPlay = () => {
+        console.log('[Player] ✅ canplay event fired, readyState:', audio.readyState);
+        // If still paused, try playing again
+        if (audio.paused && !hasError) {
+          playAudio(1);
+        }
+      };
+      audio.addEventListener('canplay', onCanPlay, { once: true });
+      audio.addEventListener('canplaythrough', onCanPlay, { once: true });
     }
   };
 
@@ -173,18 +248,34 @@ export const Player: React.FC<PlayerProps> = () => {
     
     // If currently playing, restart with new quality
     if (userStarted && audioRef.current) {
-      const wasPlaying = !audioRef.current.paused;
-      audioRef.current.src = getStreamUrl(newQuality);
-      audioRef.current.load();
+      const audio = audioRef.current;
+      const wasPlaying = !audio.paused;
+      audio.src = getStreamUrl(newQuality);
+      audio.load();
       
       if (wasPlaying) {
-        setTimeout(() => {
-          if (audioRef.current) {
-            audioRef.current.play().catch((err) => {
-              console.error('Failed to play after quality change:', err);
-            });
-          }
-        }, 100);
+        // Wait for audio to be ready before playing (iOS Safari requirement)
+        const playAudio = () => {
+          if (!audio) return;
+          audio.play().catch((err) => {
+            console.error('Failed to play after quality change:', err);
+            setHasError(true);
+            setErrorMessage('Failed to switch quality. Please try again.');
+          });
+        };
+        
+        if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          playAudio();
+        } else {
+          const onCanPlay = () => {
+            audio.removeEventListener('canplay', onCanPlay);
+            audio.removeEventListener('canplaythrough', onCanPlay);
+            playAudio();
+          };
+          
+          audio.addEventListener('canplay', onCanPlay, { once: true });
+          audio.addEventListener('canplaythrough', onCanPlay, { once: true });
+        }
       }
     }
   };
@@ -227,8 +318,9 @@ export const Player: React.FC<PlayerProps> = () => {
         ref={audioRef}
         src={userStarted ? getStreamUrl(quality) : undefined}
         autoPlay={false}
-        preload="auto"
+        preload="none"
         crossOrigin="anonymous"
+        playsInline
       />
       
       <div className="relative z-10">
