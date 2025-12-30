@@ -248,23 +248,23 @@ pub async fn stream_proxy(
         Ok(response) => {
             let mut builder = HttpResponse::Ok();
             
-            // Copy content-type header, default to audio/mpeg if not set
-            if let Some(content_type) = response.headers().get("content-type") {
-                if let Ok(content_type_str) = content_type.to_str() {
-                    builder.insert_header(("content-type", content_type_str));
-                }
-            } else {
-                // Default to MP3 MIME type for LAME encoder
-                builder.insert_header(("content-type", "audio/mpeg"));
-            }
+            // CRITICAL for iOS Safari: Always force Content-Type to audio/mpeg
+            // Real iOS devices are very strict and MPD might not send proper headers
+            // We override whatever MPD sends to ensure iOS recognizes it as MP3
+            builder.insert_header(("content-type", "audio/mpeg"));
             
             // Optimize headers for streaming
             builder.insert_header(("Access-Control-Allow-Origin", "*"));
+            builder.insert_header(("Access-Control-Allow-Methods", "GET, OPTIONS"));
+            builder.insert_header(("Access-Control-Allow-Headers", "Range, Content-Type"));
             builder.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"));
             builder.insert_header(("Pragma", "no-cache"));
             builder.insert_header(("Connection", "keep-alive"));
             builder.insert_header(("Accept-Ranges", "none")); // Streaming doesn't support range requests
             builder.insert_header(("X-Content-Type-Options", "nosniff"));
+            
+            // Additional headers that help iOS Safari recognize the stream
+            builder.insert_header(("Content-Transfer-Encoding", "binary"));
             
             // Wrap the stream with connection tracking
             // When the stream is dropped (client disconnects), the connection slot is released

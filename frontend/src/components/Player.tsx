@@ -29,7 +29,7 @@ export const Player: React.FC<PlayerProps> = () => {
     return 'medium';
   });
   
-  const { queue } = useRadio();
+  const { queue, currentTrack } = useRadio();
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -48,6 +48,25 @@ export const Player: React.FC<PlayerProps> = () => {
       console.error('Audio error details:', audio.error);
       setHasError(true);
       setIsBuffering(false);
+      
+      // Check for format errors (especially important for iOS)
+      if (audio.error) {
+        const errorCode = audio.error.code;
+        // MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
+        if (errorCode === 4 || errorCode === 3) {
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          if (isIOS) {
+            setErrorMessage('Audio format not supported on iOS. The stream may need to be MP3 format. Try the "128 kbps" quality setting.');
+          } else {
+            setErrorMessage('Audio format not supported. Please try a different quality setting.');
+          }
+          return;
+        } else if (errorCode === 2) {
+          setErrorMessage('Network error. Please check your connection and try again.');
+          return;
+        }
+      }
+      
       // Set a helpful error message based on queue status
       if (queue.length === 0) {
         setErrorMessage('No music in queue. Please upload and add music to the queue first.');
@@ -108,6 +127,102 @@ export const Player: React.FC<PlayerProps> = () => {
     }
   }, [volume, isMuted]);
 
+  // Media Session API for Android notification
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return;
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Set up Media Session metadata
+    const updateMetadata = () => {
+      if (currentTrack?.track) {
+        const track = currentTrack.track;
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: track.title || 'Muchas Radio',
+          artist: track.artist || 'Live Stream',
+          album: track.album || 'Muchas Radio',
+        });
+      } else {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: 'Muchas Radio',
+          artist: 'Live Stream',
+        });
+      }
+    };
+
+    // Update position state for notification
+    const updatePositionState = () => {
+      if (audio && !audio.paused && !isNaN(audio.currentTime) && isFinite(audio.currentTime) && audio.currentTime >= 0) {
+        try {
+          const duration = currentTrack?.track?.duration;
+          navigator.mediaSession.setPositionState({
+            duration: duration && duration > 0 ? duration : Infinity,
+            playbackRate: 1.0,
+            position: audio.currentTime,
+          });
+        } catch (e) {
+          // Some browsers may not support setPositionState
+          console.debug('MediaSession setPositionState not supported:', e);
+        }
+      }
+    };
+
+    // Handle Media Session actions
+    navigator.mediaSession.setActionHandler('play', () => {
+      if (audio && audio.paused) {
+        audio.play().catch(console.error);
+      }
+    });
+
+    navigator.mediaSession.setActionHandler('pause', () => {
+      if (audio && !audio.paused) {
+        audio.pause();
+      }
+    });
+
+    // Update metadata when track changes or playback starts
+    updateMetadata();
+
+    // Update position state periodically
+    const positionInterval = setInterval(() => {
+      if (userStarted && audio && !audio.paused) {
+        updatePositionState();
+      } else if (audio.paused || !userStarted) {
+        // Don't clear, just don't update - the position should remain visible
+      }
+    }, 500); // Update every 500ms for smoother updates
+
+    // Also update on timeupdate event for more accuracy
+    const handleTimeUpdate = () => {
+      if (userStarted && !audio.paused) {
+        updatePositionState();
+      }
+    };
+
+    // Update when playback state changes
+    const handlePlay = () => {
+      updateMetadata();
+      updatePositionState();
+    };
+
+    const handlePause = () => {
+      // Keep position state visible but paused
+      updatePositionState();
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+
+    return () => {
+      clearInterval(positionInterval);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+    };
+  }, [userStarted, currentTrack]);
+
   const handlePlay = async () => {
     // Check if queue is empty before attempting to play
     if (queue.length === 0) {
@@ -125,15 +240,37 @@ export const Player: React.FC<PlayerProps> = () => {
       
       const audio = audioRef.current;
       const streamUrl = getStreamUrl(quality);
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      
+      // For iOS, we need to ensure the audio element is properly configured
+      // before setting the source
+      audio.crossOrigin = 'anonymous';
       
       // Set the source and load the stream
       audio.src = streamUrl;
+      
+      // Clear any previous errors
       audio.load();
       
       // iOS Safari/Chrome requires the audio element to be ready before calling play()
-      // Wait for canplay or canplaythrough event instead of using a timeout
+      // Real iOS devices are stricter and need more time to detect the format
       const playAudio = (retryCount = 0) => {
         if (!audio || !audioRef.current) return;
+        
+        // On real iOS devices, we need to wait longer for format detection
+        // Check if we have enough data loaded
+        const hasEnoughData = audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+        const shouldWaitForMoreData = isIOS && !hasEnoughData && retryCount < 2;
+        
+        if (shouldWaitForMoreData) {
+          console.log(`[Player] iOS: Waiting for more data, readyState: ${audio.readyState}`);
+          setTimeout(() => {
+            if (audio && audioRef.current && audio.src === streamUrl) {
+              playAudio(retryCount + 1);
+            }
+          }, 500);
+          return;
+        }
         
         // On iOS, sometimes we need to wait a bit longer even after canplay
         const attemptPlay = () => {
@@ -148,18 +285,24 @@ export const Player: React.FC<PlayerProps> = () => {
               })
               .catch((err) => {
                 console.error('Failed to play:', err);
+                console.error('Audio readyState:', audio.readyState);
+                console.error('Audio error:', audio.error);
                 
                 // Retry for certain errors or if audio isn't ready yet
-                const shouldRetry = retryCount < 3 && (
+                // Real iOS devices might need more retries
+                const maxRetries = isIOS ? 5 : 3;
+                const shouldRetry = retryCount < maxRetries && (
                   err?.name === 'NotAllowedError' || 
                   err?.message?.includes('play() request was interrupted') ||
                   err?.message?.includes('The play() request was interrupted') ||
                   audio.readyState === HTMLMediaElement.HAVE_NOTHING ||
-                  (audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA && retryCount < 2)
+                  (audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA && retryCount < 3)
                 );
                 
                 if (shouldRetry) {
-                  const delay = retryCount === 0 ? 100 : retryCount === 1 ? 500 : 1000;
+                  // iOS needs longer delays between retries
+                  const baseDelay = isIOS ? 300 : 100;
+                  const delay = retryCount === 0 ? baseDelay : retryCount === 1 ? (baseDelay * 3) : (baseDelay * 5);
                   console.log(`[Player] Retrying play attempt ${retryCount + 1} in ${delay}ms...`);
                   setTimeout(() => {
                     if (audio && audioRef.current && audio.src === streamUrl) {
@@ -176,20 +319,33 @@ export const Player: React.FC<PlayerProps> = () => {
                 const errorName = err?.name || '';
                 const errorMessage = err?.message || '';
                 
+                // Check audio element state for more info (this is especially important for iOS)
+                let formatError = false;
+                if (audio.error) {
+                  const errorCode = audio.error.code;
+                  // MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
+                  if (errorCode === 4 || errorCode === 3) {
+                    formatError = true;
+                  }
+                }
+                
                 if (errorName === 'NotAllowedError' || errorMessage.includes('play() request was interrupted')) {
                   setErrorMessage('Playback was blocked. Please tap the play button again.');
-                } else if (errorName === 'NotSupportedError') {
-                  setErrorMessage('Audio format not supported. Please try a different quality setting.');
+                } else if (errorName === 'NotSupportedError' || formatError) {
+                  // iOS-specific: Try suggesting lower quality or checking stream format
+                  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                  if (isIOS) {
+                    setErrorMessage('Audio format not supported on iOS. Try the "128 kbps" quality setting, or ensure the stream is MP3 format.');
+                  } else {
+                    setErrorMessage('Audio format not supported. Please try a different quality setting.');
+                  }
                 } else if (queue.length === 0) {
                   setErrorMessage('No music in queue. Please upload and add music to the queue first.');
                 } else {
                   // Check audio element state for more info
                   if (audio.error) {
                     const errorCode = audio.error.code;
-                    // MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
-                    if (errorCode === 4) {
-                      setErrorMessage('Audio format not supported. Please try a different quality setting.');
-                    } else if (errorCode === 2) {
+                    if (errorCode === 2) {
                       setErrorMessage('Network error. Please check your connection and try again.');
                     } else {
                       setErrorMessage('Failed to start playback. Please check if music is in the queue.');
@@ -216,15 +372,40 @@ export const Player: React.FC<PlayerProps> = () => {
       playAudio();
       
       // Also listen for canplay as backup (especially for iOS)
+      // Real iOS devices might need loadedmetadata or loadeddata events
       const onCanPlay = () => {
         console.log('[Player] ✅ canplay event fired, readyState:', audio.readyState);
         // If still paused, try playing again
         if (audio.paused && !hasError) {
-          playAudio(1);
+          // On iOS, wait a bit more even after canplay
+          const delay = isIOS ? 200 : 0;
+          setTimeout(() => {
+            if (audio && audio.paused && !hasError) {
+              playAudio(1);
+            }
+          }, delay);
         }
       };
+      
+      // For iOS, also listen to loadedmetadata and loadeddata
+      const onLoadedData = () => {
+        console.log('[Player] ✅ loadeddata event fired, readyState:', audio.readyState);
+        if (isIOS && audio.paused && !hasError) {
+          // Give iOS a moment to process the format
+          setTimeout(() => {
+            if (audio && audio.paused && !hasError) {
+              playAudio(1);
+            }
+          }, 300);
+        }
+      };
+      
       audio.addEventListener('canplay', onCanPlay, { once: true });
       audio.addEventListener('canplaythrough', onCanPlay, { once: true });
+      if (isIOS) {
+        audio.addEventListener('loadedmetadata', onLoadedData, { once: true });
+        audio.addEventListener('loadeddata', onLoadedData, { once: true });
+      }
     }
   };
 
@@ -318,7 +499,7 @@ export const Player: React.FC<PlayerProps> = () => {
         ref={audioRef}
         src={userStarted ? getStreamUrl(quality) : undefined}
         autoPlay={false}
-        preload="none"
+        preload="metadata"
         crossOrigin="anonymous"
         playsInline
       />
