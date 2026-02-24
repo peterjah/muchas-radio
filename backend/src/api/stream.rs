@@ -259,7 +259,6 @@ pub async fn stream_proxy(
             builder.insert_header(("Access-Control-Allow-Headers", "Range, Content-Type"));
             builder.insert_header(("Cache-Control", "no-cache, no-store, must-revalidate"));
             builder.insert_header(("Pragma", "no-cache"));
-            builder.insert_header(("Connection", "keep-alive"));
             builder.insert_header(("Accept-Ranges", "none")); // Streaming doesn't support range requests
             builder.insert_header(("X-Content-Type-Options", "nosniff"));
             

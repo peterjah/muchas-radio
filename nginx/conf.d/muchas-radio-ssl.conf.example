@@ -67,7 +67,6 @@ server {
         # Streaming headers
         add_header Cache-Control "no-cache, no-store, must-revalidate" always;
         add_header Pragma "no-cache" always;
-        add_header Connection "keep-alive" always;
         add_header X-Accel-Buffering "no" always;
 
         # Chunked transfer encoding support

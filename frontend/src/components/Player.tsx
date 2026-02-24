@@ -152,25 +152,15 @@ export const Player: React.FC<PlayerProps> = () => {
     };
 
     // Update position state for notification
-    // For live streams (no duration), we don't set position state as Android
-    // doesn't handle Infinity duration well - it shows progress stuck at the end
     const updatePositionState = () => {
       if (audio && !audio.paused && !isNaN(audio.currentTime) && isFinite(audio.currentTime) && audio.currentTime >= 0) {
         try {
           const duration = currentTrack?.track?.duration;
-          
-          // Only set position state if we have a valid track duration
-          // For live streams without duration, skip position state to avoid
-          // Android showing progress bar stuck at the end
-          if (duration && duration > 0 && isFinite(duration)) {
-            navigator.mediaSession.setPositionState({
-              duration: duration,
-              playbackRate: 1.0,
-              position: Math.min(audio.currentTime, duration), // Ensure position doesn't exceed duration
-            });
-          }
-          // For live streams (no duration), we don't set position state
-          // The notification will still show metadata and controls, just no progress bar
+          navigator.mediaSession.setPositionState({
+            duration: duration && duration > 0 ? duration : Infinity,
+            playbackRate: 1.0,
+            position: audio.currentTime,
+          });
         } catch (e) {
           // Some browsers may not support setPositionState
           console.debug('MediaSession setPositionState not supported:', e);
