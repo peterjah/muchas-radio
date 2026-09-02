@@ -70,7 +70,7 @@ services:
     networks:
       - muchas-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -93,8 +93,12 @@ services:
       - backend
     networks:
       - muchas-network
+    # Reload every 6h so certificates renewed by certbot are picked up.
+    # certbot runs in a separate container and cannot signal nginx directly
+    # (that would require mounting the docker socket).
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:80"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -106,12 +110,10 @@ services:
     volumes:
       - certbot-www:/var/www/certbot
       - certbot-conf:/etc/letsencrypt
+    restart: unless-stopped
     networks:
       - muchas-network
-    # Only start this container after initial certificates are obtained
     # For one-off certbot commands, use: docker compose run --rm --entrypoint="" certbot certbot ...
-    profiles:
-      - ssl-renewal
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
 volumes:
