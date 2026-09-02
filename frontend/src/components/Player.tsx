@@ -10,6 +10,9 @@ interface PlayerProps {
 }
 
 const STREAM_QUALITY_KEY = 'muchas-radio-stream-quality';
+// Survives a reload of the same tab, which is what happens when Android
+// discards the page while it is backgrounded.
+const WAS_PLAYING_KEY = 'muchas-radio-was-playing';
 
 export const Player: React.FC<PlayerProps> = () => {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -234,6 +237,7 @@ export const Player: React.FC<PlayerProps> = () => {
     if (audioRef.current) {
       console.log('User clicked play, stream URL:', getStreamUrl(quality));
       setUserStarted(true);
+      sessionStorage.setItem(WAS_PLAYING_KEY, '1');
       setIsBuffering(true);
       setHasError(false);
       setErrorMessage(null);
@@ -413,8 +417,59 @@ export const Player: React.FC<PlayerProps> = () => {
     if (audioRef.current) {
       audioRef.current.pause();
       setUserStarted(false);
+      sessionStorage.removeItem(WAS_PLAYING_KEY);
     }
   };
+
+  // Playback used to die silently. Android can freeze or discard the page
+  // while it is backgrounded, which closes the stream, and nothing noticed it
+  // was gone -- so it stayed dead until the play button was tapped again.
+  // These two effects cover the two ways that happens.
+  const autoResumedRef = useRef(false);
+
+  // The page survived but the stream did not: restart it once we are visible
+  // again. No dependency array, so the listeners always close over the current
+  // handlePlay and state rather than a stale render.
+  useEffect(() => {
+    if (!userStarted) return;
+
+    const resumeIfStopped = () => {
+      const audio = audioRef.current;
+      if (!audio || document.visibilityState !== 'visible') return;
+
+      const stopped =
+        audio.paused ||
+        !!audio.error ||
+        audio.readyState < HTMLMediaElement.HAVE_CURRENT_DATA;
+      if (!stopped) return;
+
+      console.log('[Player] Stream stopped while backgrounded, restarting');
+      void handlePlay();
+    };
+
+    document.addEventListener('visibilitychange', resumeIfStopped);
+    window.addEventListener('online', resumeIfStopped);
+
+    return () => {
+      document.removeEventListener('visibilitychange', resumeIfStopped);
+      window.removeEventListener('online', resumeIfStopped);
+    };
+  });
+
+  // The page was discarded and reloaded, so userStarted is back to false.
+  // Restore the intent once the queue is known. Autoplay may still be blocked
+  // by the browser, in which case the play button remains as the fallback.
+  useEffect(() => {
+    if (autoResumedRef.current || userStarted || queue.length === 0) return;
+    if (sessionStorage.getItem(WAS_PLAYING_KEY) !== '1') return;
+
+    autoResumedRef.current = true;
+    console.log('[Player] Restoring playback after reload');
+    // Deferred so handlePlay's setState calls do not run synchronously
+    // inside the effect.
+    const timer = window.setTimeout(() => void handlePlay(), 0);
+    return () => window.clearTimeout(timer);
+  }, [queue.length, userStarted]);
 
   const toggleMute = () => {
     setIsMuted(!isMuted);
