@@ -6,11 +6,13 @@ services:
       dockerfile: Dockerfile
     container_name: muchas-mpd
     restart: unless-stopped
-    ports:
-      - "6600:6600"  # MPD control port
-      - "8001:8001"  # HTTP stream port (low quality - 128 kbps)
-      - "8002:8002"  # HTTP stream port (medium quality - 192 kbps)
-      - "8003:8003"  # HTTP stream port (high quality - 320 kbps)
+    # No ports published. MPD is reached over the compose network as `mpd`
+    # (backend uses MPD_HOST=mpd and http://mpd:8003), so publishing these on
+    # the host only exposed them to the internet:
+    #   6600 is MPD's control port and has no password or permission config,
+    #        letting anyone stop playback or clear the queue.
+    #   8001-8003 served the raw streams directly, bypassing nginx and its
+    #        limit_req/limit_conn rules and TLS.
     volumes:
       - mpd-data:/var/lib/mpd
       - music-uploads:/music
