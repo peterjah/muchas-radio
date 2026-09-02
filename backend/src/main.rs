@@ -9,7 +9,7 @@ use log::info;
 use std::env;
 
 use crate::mpd_manager::start_mpd_monitor;
-use crate::state::AppState;
+use crate::state::{connect_mpd, AppState};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -28,29 +28,20 @@ async fn main() -> std::io::Result<()> {
     info!("Connecting to MPD at {}:{}", mpd_host, mpd_port);
     
     let mpd_addr = format!("{}:{}", mpd_host, mpd_port);
-    let connection = match tokio::net::TcpStream::connect(&mpd_addr).await {
-        Ok(conn) => conn,
-        Err(e) => {
-            eprintln!("Failed to connect to MPD at {}: {}", mpd_addr, e);
-            eprintln!("Make sure the MPD service is running and accessible at {}:{}", mpd_host, mpd_port);
-            std::process::exit(1);
-        }
-    };
-    
-    let (mpd_client, _events) = match mpd_client::Client::connect(connection).await {
-        Ok(client_tuple) => {
-            info!("Successfully connected to MPD at {}:{}", mpd_host, mpd_port);
-            client_tuple
+    let mpd_client = match connect_mpd(&mpd_addr).await {
+        Ok(client) => {
+            info!("Successfully connected to MPD at {}", mpd_addr);
+            client
         }
         Err(e) => {
-            eprintln!("Failed to connect to MPD at {}: {}", mpd_addr, e);
-            eprintln!("Make sure the MPD service is running and accessible at {}:{}", mpd_host, mpd_port);
+            eprintln!("{}", e);
+            eprintln!("Make sure the MPD service is running and accessible at {}", mpd_addr);
             std::process::exit(1);
         }
     };
     
     // Create application state
-    let app_state = web::Data::new(AppState::new(mpd_client));
+    let app_state = web::Data::new(AppState::new(mpd_client, mpd_addr));
     
     // Start MPD monitor
     start_mpd_monitor(app_state.get_ref().clone()).await;

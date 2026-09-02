@@ -10,7 +10,7 @@ use std::path::Path;
 /// Remove the last track from the MPD queue
 /// If delete_file is true, also deletes the file from disk
 pub async fn remove_last_track_from_queue(state: &AppState, delete_file: bool) -> Result<Option<String>, String> {
-    let client = state.mpd_client.lock().await;
+    let client = state.mpd().await?;
     
     // Get the queue
     let queue = client
@@ -73,7 +73,7 @@ pub async fn remove_last_track_from_queue(state: &AppState, delete_file: bool) -
 }
 
 pub async fn add_file_to_mpd(state: &AppState, filename: &str) -> Result<(), String> {
-    let client = state.mpd_client.lock().await;
+    let client = state.mpd().await?;
     
     client
         .command(commands::Update::new())
@@ -197,7 +197,7 @@ pub async fn add_file_to_mpd(state: &AppState, filename: &str) -> Result<(), Str
 }
 
 pub async fn get_current_track(state: &AppState) -> Result<CurrentTrack, String> {
-    let client = state.mpd_client.lock().await;
+    let client = state.mpd().await?;
     
     let status = client
         .command(commands::Status)
@@ -227,7 +227,7 @@ pub async fn get_current_track(state: &AppState) -> Result<CurrentTrack, String>
 }
 
 pub async fn get_queue(state: &AppState) -> Result<Vec<QueueItem>, String> {
-    let client = state.mpd_client.lock().await;
+    let client = state.mpd().await?;
     
     let queue = client
         .command(commands::Queue)
@@ -382,7 +382,7 @@ async fn song_in_queue_to_track(song: &SongInQueue, state: &AppState) -> Track {
 }
 
 pub async fn start_playback(state: &AppState) -> Result<(), String> {
-    let client = state.mpd_client.lock().await;
+    let client = state.mpd().await?;
     
     let status = client
         .command(commands::Status)
@@ -424,7 +424,13 @@ pub async fn start_mpd_monitor(state: AppState) {
             match get_current_track(&state).await {
                 Ok(current) => {
                     // Get the current song to detect changes
-                    let client = state.mpd_client.lock().await;
+                    let client = match state.mpd().await {
+                        Ok(client) => client,
+                        Err(e) => {
+                            error!("Failed to reach MPD: {}", e);
+                            continue;
+                        }
+                    };
                     let current_song = client.command(commands::CurrentSong).await.ok().flatten();
                     let current_track_filename = current_song.as_ref()
                         .map(|s| s.song.url.to_string());
@@ -484,7 +490,13 @@ pub async fn start_mpd_monitor(state: AppState) {
                     if current.state == PlaybackState::Stopped && current.track.is_none() {
                         // Check if there are tracks in the queue and restart from the beginning
                         {
-                            let client = state.mpd_client.lock().await;
+                            let client = match state.mpd().await {
+                                Ok(client) => client,
+                                Err(e) => {
+                                    error!("Failed to reach MPD: {}", e);
+                                    continue;
+                                }
+                            };
                             let queue = client
                                 .command(commands::Queue)
                                 .await;

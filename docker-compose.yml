@@ -38,7 +38,8 @@ services:
       - MPD_HOST=mpd
       - MPD_PORT=6600
       - BIND_ADDR=0.0.0.0:8080
-      - RUST_LOG=info
+      # mpd_protocol logs every command at INFO, which buries real errors.
+      - RUST_LOG=info,mpd_protocol=warn
       - MAX_TOTAL_STORAGE=${MAX_TOTAL_STORAGE:-300MB}
     volumes:
       - music-uploads:/app/uploads
