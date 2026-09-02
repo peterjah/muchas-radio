@@ -435,8 +435,17 @@ pub async fn start_mpd_monitor(state: AppState) {
                     let current_track_filename = current_song.as_ref()
                         .map(|s| s.song.url.to_string());
                     
+                    // Record the current track before handling the change below.
+                    // Updating it afterwards meant an early exit from that block
+                    // left it stale, so the next tick re-detected the same change.
+                    let previous_filename = std::mem::replace(
+                        &mut previous_track_filename,
+                        current_track_filename.clone(),
+                    );
+                    let mut queue_changed = false;
+                    
                     // Check if song has changed (track finished playing)
-                    if let (Some(prev_filename), Some(curr_filename)) = (previous_track_filename.as_ref(), current_track_filename.as_ref()) {
+                    if let (Some(prev_filename), Some(curr_filename)) = (previous_filename.as_ref(), current_track_filename.as_ref()) {
                         if prev_filename != curr_filename {
                             // Song has changed, move the previous song to the end
                             info!("Song changed from {} to {}, moving previous track to end", prev_filename, curr_filename);
@@ -464,14 +473,7 @@ pub async fn start_mpd_monitor(state: AppState) {
                                                 error!("Failed to move completed track to end: {}", e);
                                             } else {
                                                 info!("Moved completed track to end of queue (storage: {}/{} bytes)", current_size, max_storage);
-                                                // Notify clients of queue update
-                                                let queue_update = serde_json::json!({
-                                                    "type": "queue_update",
-                                                    "data": {}
-                                                });
-                                                drop(client); // Release lock before async call
-                                                state.broadcast_message(&queue_update.to_string()).await;
-                                                continue; // Skip the rest of this iteration
+                                                queue_changed = true;
                                             }
                                         }
                                     } else {
@@ -482,9 +484,16 @@ pub async fn start_mpd_monitor(state: AppState) {
                         }
                     }
                     
-                    // Update previous track filename
-                    previous_track_filename = current_track_filename;
-                    drop(client);
+                    drop(client); // Release lock before async calls
+                    
+                    // Notify clients of queue update
+                    if queue_changed {
+                        let queue_update = serde_json::json!({
+                            "type": "queue_update",
+                            "data": {}
+                        });
+                        state.broadcast_message(&queue_update.to_string()).await;
+                    }
                     
                     // Check if queue playback has ended (stopped state with no current track but queue has items)
                     if current.state == PlaybackState::Stopped && current.track.is_none() {
